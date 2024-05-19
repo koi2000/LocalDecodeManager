@@ -179,4 +179,46 @@ static MCGAL::Point readPointByOffset(char* buffer, int offset) {
     return pt;
 }
 
+static float readFloatByOffsetRef(char* buffer, int& offset) {
+    float f = *(float*)(buffer + offset);
+    offset += sizeof(float);
+    return f;
+}
+
+static int16_t readInt16ByOffsetRef(char* buffer, int& offset) {
+    int16_t i = *(int16_t*)(buffer + offset);
+    offset += sizeof(int16_t);
+    return i;
+}
+
+static uint16_t readuInt16ByOffsetRef(char* buffer, int& offset) {
+    uint16_t i = *(uint16_t*)(buffer + offset);
+    offset += sizeof(uint16_t);
+    return i;
+}
+
+static int readIntByOffsetRef(char* buffer, int& offset) {
+    int i = *(int*)(buffer + offset);
+    offset += sizeof(int);
+    return i;
+}
+
+static unsigned char readCharByOffsetRef(char* buffer, int& offset) {
+    unsigned char i = *(unsigned char*)(buffer + offset);
+    offset += sizeof(unsigned char);
+    return i;
+}
+
+static MCGAL::Point readPointByOffsetRef(char* buffer, int& offset) {
+    float coord[3];
+    int id = readIntByOffset(buffer, offset);
+    offset += sizeof(int);
+    for (unsigned i = 0; i < 3; ++i) {
+        coord[i] = readFloatByOffset(buffer, offset);
+        offset += sizeof(float);
+    }
+    MCGAL::Point pt(coord[0], coord[1], coord[2], id);
+    return pt;
+}
+
 #endif

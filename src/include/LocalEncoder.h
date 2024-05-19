@@ -7,6 +7,7 @@
 #include <queue>
 #include <random>
 #include <set>
+#include <vector>
 #include <string>
 
 #define BUFFER_SIZE 10 * 1024 * 1024

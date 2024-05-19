@@ -164,6 +164,8 @@ void LocalEncoder::encodeHalfedgeSymbolOp(int groupId) {
 }
 
 void LocalEncoder::dumpToBuffer() {
+    writeBaseMesh();
+    // 写入起始点
     writeInt(buffer, dataOffset, seeds.size());
     for (int i = 0; i < seeds.size(); i++) {
         writeInt(buffer, dataOffset, seeds[i]->vertex->id);
@@ -172,8 +174,6 @@ void LocalEncoder::dumpToBuffer() {
     for (int i = 0; i < compressRounds.size(); i++) {
         writeInt(buffer, dataOffset, compressRounds[i]);
     }
-    writeBaseMesh();
-    // 写入起始点
     dumpFacetSymbolToBuffer();
     dumpHalfedgeSymbolToBuffer();
 }
@@ -193,16 +193,20 @@ void LocalEncoder::dumpFacetSymbolToBuffer() {
     for (int i = 0; i < offsets.size(); i++) {
         writeInt(buffer, dataOffset, offsets[i]);
     }
+    int index = 0;
     for (int i = 0; i < offsets.size(); i++) {
         std::deque<unsigned> connSym = connectFaceSym[i];
         std::deque<MCGAL::Point> geomSym = geometrySym[i];
         for (unsigned j = 0; j < connSym.size(); ++j) {
             unsigned sym = connSym[j];
             writeChar(buffer, dataOffset, sym);
+            if (sym) {
+                writePoint(buffer, dataOffset, geomSym[index++]);
+            }
         }
-        for (unsigned j = 0; j < geomSym.size(); j++) {
-            writePoint(buffer, dataOffset, geomSym[j]);
-        }
+        // for (unsigned j = 0; j < geomSym.size(); j++) {
+        //     writePoint(buffer, dataOffset, geomSym[j]);
+        // }
     }
 }
 
