@@ -27,13 +27,18 @@ void LocalEncoder::dumpToFile(std::string path) {
 
 void LocalEncoder::encode() {
     markBoundry();
-    for (int i = 0; i < seeds.size(); i++) {
-        for (int j = 0; j < 10; j++) {
+    char path[256];
+    sprintf(path, "./gisdata/decompressed_%d.mesh.off", -1);
+    mesh.dumpto(path);
+    resetState();
+    for (int j = 0; j < 10; j++) {
+        for (int i = 0; i < seeds.size(); i++) {
             int result = encodeOp(i);
-            if (result == 0) {
-                break;
-            }
         }
+        resetState();
+        char path[256];
+        sprintf(path, "./gisdata/decompressed_%d.mesh.off", j);
+        mesh.dumpto(path);
     }
     dumpToBuffer();
 }
@@ -53,7 +58,7 @@ bool LocalEncoder::encodeOp(int groupId) {
         bool hasRemovable = false;
         MCGAL::Halfedge* unconqueredVertexHE;
         for (MCGAL::Halfedge* hh = h->next; hh != h; hh = hh->next) {
-            if (isRemovable(hh->end_vertex)) {
+            if (isRemovable(hh->end_vertex) && !hh->isBoundary() && !hh->opposite->isBoundary()) {
                 hasRemovable = true;
                 unconqueredVertexHE = hh;
                 break;
@@ -65,9 +70,11 @@ bool LocalEncoder::encodeOp(int groupId) {
             do {
                 hh->vertex->setConquered();
                 MCGAL::Halfedge* hOpp = hh->opposite;
-                if (!hOpp->face->isConquered()) {
+                if (!hOpp->face->isConquered() && !hOpp->isBoundary() && !h->isBoundary()) {
+                    if (f->groupId != hOpp->face->groupId && f->groupId != -1) {
+                        printf("error");
+                    }
                     gateQueue.push(hOpp->poolId);
-                    hOpp->setInQueue();
                 }
             } while ((hh = hh->next) != h);
         } else {
@@ -77,8 +84,8 @@ bool LocalEncoder::encodeOp(int groupId) {
     }
     if (removedCount != 0) {
         compressRounds[groupId]++;
-        encodeFacetSymbolOp(groupId);
-        encodeHalfedgeSymbolOp(groupId);
+        // encodeFacetSymbolOp(groupId);
+        // encodeHalfedgeSymbolOp(groupId);
     }
     return removedCount != 0;
 }
@@ -124,7 +131,7 @@ void LocalEncoder::encodeFacetSymbolOp(int groupId) {
             MCGAL::Halfedge* hOpp = hIt->opposite;
             // 对方没有被处理，且该边不是边界
             if (!hOpp->face->isProcessed() && !hOpp->isBoundary()) {
-                gateQueue.push(hOpp->poolId);
+                gateQueue.push(hOpp->face->poolId);
             }
             hIt = hIt->next;
         } while (hIt != h);
@@ -174,8 +181,37 @@ void LocalEncoder::dumpToBuffer() {
     for (int i = 0; i < compressRounds.size(); i++) {
         writeInt(buffer, dataOffset, compressRounds[i]);
     }
+    dumpBoundaryToBuffer();
     dumpFacetSymbolToBuffer();
     dumpHalfedgeSymbolToBuffer();
+}
+
+void LocalEncoder::dumpBoundaryToBuffer() {
+    std::queue<int> gateQueue;
+    gateQueue.push(seeds[0]->poolId);
+    while (!gateQueue.empty()) {
+        int hid = gateQueue.front();
+        MCGAL::Halfedge* h = MCGAL::contextPool.getHalfedgeByIndex(hid);
+        gateQueue.pop();
+        if (h->isProcessed()) {
+            continue;
+        }
+        h->setProcessed();
+        MCGAL::Halfedge* hIt = h->next;
+        while (hIt->opposite != h) {
+            if (!hIt->isProcessed()) {
+                gateQueue.push(hIt->poolId);
+            }
+            hIt = hIt->opposite->next;
+        }
+        unsigned sym;
+        if (h->isBoundary()) {
+            sym = 1;
+        } else {
+            sym = 0;
+        }
+        writeChar(buffer, dataOffset, sym);
+    }
 }
 
 void LocalEncoder::dumpFacetSymbolToBuffer() {
@@ -204,9 +240,6 @@ void LocalEncoder::dumpFacetSymbolToBuffer() {
                 writePoint(buffer, dataOffset, geomSym[index++]);
             }
         }
-        // for (unsigned j = 0; j < geomSym.size(); j++) {
-        //     writePoint(buffer, dataOffset, geomSym[j]);
-        // }
     }
 }
 
@@ -268,7 +301,7 @@ MCGAL::Halfedge* LocalEncoder::vertexCut(std::queue<int>& gateQueue, MCGAL::Half
         if (hOpp == nullptr) {
             continue;
         }
-        if (!hOpp->face->isConquered() && !hOpp->isBoundary()) {
+        if (!hOpp->face->isConquered() && !hOpp->isBoundary() && !h->isBoundary()) {
             gateQueue.push(hOpp->poolId);
         }
     } while ((h = h->next) != hNewFace);
@@ -276,6 +309,14 @@ MCGAL::Halfedge* LocalEncoder::vertexCut(std::queue<int>& gateQueue, MCGAL::Half
 }
 
 void LocalEncoder::resetState() {
+    for (auto vit = mesh.vertices.begin(); vit != mesh.vertices.end();) {
+        if ((*vit)->isRemoved()) {
+            vit = mesh.vertices.erase(vit);
+        } else {
+            (*vit)->resetState();
+            vit++;
+        }
+    }
     for (auto fit = mesh.faces.begin(); fit != mesh.faces.end();) {
         if ((*fit)->isRemoved()) {
             fit = mesh.faces.erase(fit);
@@ -291,12 +332,12 @@ void LocalEncoder::resetState() {
 
 void LocalEncoder::markBoundry() {
     int fsize = mesh.size_of_facets();
-    int sampleNumber = fsize / 1000;
+    int sampleNumber = fsize / 3000;
     connectFaceSym.resize(sampleNumber);
     connectEdgeSym.resize(sampleNumber);
     geometrySym.resize(sampleNumber);
     compressRounds = std::vector<int>(sampleNumber, 0);
-    std::vector<int> stBfsId;
+    std::vector<int> stBfsId(fsize);
     std::vector<int> stVertex;
     for (int i = 0; i < stBfsId.size(); i++) {
         stBfsId[i] = i;
@@ -311,7 +352,6 @@ void LocalEncoder::markBoundry() {
         gateQueue.push(mesh.faces[stBfsId[i]]->poolId);
         stVertex.push_back(mesh.faces[stBfsId[i]]->halfedges[0]->vertex->id);
         stVertex.push_back(mesh.faces[stBfsId[i]]->halfedges[0]->end_vertex->id);
-        stBfsId[i] = mesh.faces[stBfsId[i]]->halfedges[0]->poolId;
     }
 
     // for (int i = 0; i < sampleNumber; i++) {
@@ -354,16 +394,34 @@ void LocalEncoder::markBoundry() {
         MCGAL::Halfedge* h = hIt;
         do {
             MCGAL::Halfedge* hOpp = hIt->opposite;
-            if (hOpp->face->groupId != f->groupId) {
-                hOpp->setBoundary();
-                hIt->setBoundary();
-            }
             if (!hOpp->face->isProcessed()) {
                 hOpp->face->groupId = f->groupId;
                 gateQueue.push(hOpp->face->poolId);
             }
             hIt = hIt->next;
         } while (hIt != h);
+    }
+
+    gateQueue.push(seeds[0]->poolId);
+    while (!gateQueue.empty()) {
+        int hid = gateQueue.front();
+        MCGAL::Halfedge* h = MCGAL::contextPool.getHalfedgeByIndex(hid);
+        gateQueue.pop();
+        if (h->isProcessed()) {
+            continue;
+        }
+        h->setProcessed();
+        if (h->face->groupId != h->opposite->face->groupId) {
+            h->setBoundary();
+            h->opposite->setBoundary();
+        }
+        MCGAL::Halfedge* hIt = h->next;
+        while (hIt->opposite != h) {
+            if (!hIt->isProcessed()) {
+                gateQueue.push(hIt->poolId);
+            }
+            hIt = hIt->opposite->next;
+        }
     }
 }
 
@@ -379,11 +437,13 @@ bool LocalEncoder::isRemovable(MCGAL::Vertex* v) {
         std::vector<MCGAL::Halfedge*> heh_oneRing;
         heh_oneRing.reserve(v->vertex_degree());
         for (MCGAL::Halfedge* hit : v->halfedges) {
-            return !hit->isBoundary();
+            if (hit->isBoundary()) {
+                return false;
+            }
             vh_oneRing.push_back(hit->opposite->vertex->point());
             heh_oneRing.push_back(hit);
         }
-        bool removable = !willViolateManifold(heh_oneRing) && arePointsCoplanar(vh_oneRing);
+        bool removable = !willViolateManifold(heh_oneRing);  // && arePointsCoplanar(vh_oneRing);
         if (removable) {
             return checkCompetition(v);
         }

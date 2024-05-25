@@ -4,5 +4,49 @@
 	// 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
 	"version": "0.2.0",
 	"configurations": [
+		{
+			"name": "LocalEncoderTest",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/build/LocalEncoderTest",
+			"args": [
+				"/home/koi/mastercode/Mini_CGAL/static/dragon.off"
+			],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}/build",
+			"environment": [],
+			"externalConsole": false,
+			"MIMode": "gdb",
+			"preLaunchTask": "CMake Build",
+			"setupCommands": [
+				{
+					"description": "Enable pretty-printing for gdb",
+					"text": "-enable-pretty-printing",
+					"ignoreFailures": true
+				}
+			]
+		},
+		{
+			"name": "LocalDecoderTest",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/build/LocalDecoderTest",
+			"args": [
+				"/home/koi/mastercode/Mini_CGAL/static/dragon.off"
+			],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}/build",
+			"environment": [],
+			"externalConsole": false,
+			"MIMode": "gdb",
+			"preLaunchTask": "CMake Build",
+			"setupCommands": [
+				{
+					"description": "Enable pretty-printing for gdb",
+					"text": "-enable-pretty-printing",
+					"ignoreFailures": true
+				}
+			]
+		},
 	]
 }

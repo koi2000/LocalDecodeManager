@@ -21,6 +21,8 @@ class LocalDecoder {
 
     void decodeOp(int groupId, int lod);
 
+    void dumpToOFF(std::string path);
+
   private:
     std::vector<int> decodeFacetSymbolOp(int groupId);
 

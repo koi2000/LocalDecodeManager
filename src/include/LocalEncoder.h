@@ -26,6 +26,8 @@ class LocalEncoder {
 
     void writeBaseMesh();
 
+    void dumpBoundaryToBuffer();
+
     void dumpFacetSymbolToBuffer();
 
     void dumpHalfedgeSymbolToBuffer();

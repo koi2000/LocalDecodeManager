@@ -63,23 +63,18 @@ static float readFloat(char* buffer, int& dataOffset) {
     return f;
 }
 
+// Write an integer in the data buffer
+static void writeInt(char* buffer, int& dataOffset, int i) {
+    *(int*)(buffer + dataOffset) = i;
+    dataOffset += sizeof(int);
+}
+
 // Write a floating point number in the data buffer.
 static void writePoint(char* buffer, int& dataOffset, MCGAL::Point& p) {
     writeInt(buffer, dataOffset, p.id);
     for (unsigned i = 0; i < 3; ++i) {
         writeFloat(buffer, dataOffset, p[i]);
     }
-}
-
-// Write a floating point number in the data buffer.
-static MCGAL::Point readPoint(char* buffer, int& dataOffset) {
-    float coord[3];
-    int id = readInt(buffer, dataOffset);
-    for (unsigned i = 0; i < 3; ++i) {
-        coord[i] = readFloat(buffer, dataOffset);
-    }
-    MCGAL::Point pt(coord[0], coord[1], coord[2], id);
-    return pt;
 }
 
 /**
@@ -91,10 +86,15 @@ static int readInt(char* buffer, int& dataOffset) {
     return i;
 }
 
-// Write an integer in the data buffer
-static void writeInt(char* buffer, int& dataOffset, int i) {
-    *(int*)(buffer + dataOffset) = i;
-    dataOffset += sizeof(int);
+// Write a floating point number in the data buffer.
+static MCGAL::Point readPoint(char* buffer, int& dataOffset) {
+    float coord[3];
+    int id = readInt(buffer, dataOffset);
+    for (unsigned i = 0; i < 3; ++i) {
+        coord[i] = readFloat(buffer, dataOffset);
+    }
+    MCGAL::Point pt(coord[0], coord[1], coord[2], id);
+    return pt;
 }
 
 /**

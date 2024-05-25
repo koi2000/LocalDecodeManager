@@ -5,7 +5,7 @@ set(CMAKE_CUDA_COMPILER "/usr/local/cuda-12.3/bin/nvcc")
 project(LocalDecodeManager LANGUAGES  CXX C CUDA)
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -g -Wno-unused-result -lpthread")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -Wno-unused-result -lpthread")
 
 
 include_directories(
@@ -14,8 +14,20 @@ include_directories(
     /usr/local/include
     ${CUDA_INCLUDE_DIRS}
 )
+
+file(GLOB_RECURSE LOCAL_COMPRESS_FILES
+    "src/include/*.h"
+    "src/*.cpp"
+)
+
 find_package(OpenMP REQUIRED)
 find_package(CUDA REQUIRED)
 
 add_executable(MCGAL_Test tools/MCGAL_Test.cpp)
 target_link_libraries(MCGAL_Test /usr/local/lib/libMCGAL.so)
+
+add_executable(LocalEncoderTest tools/LocalEncoderTest.cpp ${LOCAL_COMPRESS_FILES})
+target_link_libraries(LocalEncoderTest /usr/local/lib/libMCGAL.so)
+
+add_executable(LocalDecoderTest tools/LocalDecoderTest.cpp ${LOCAL_COMPRESS_FILES})
+target_link_libraries(LocalDecoderTest /usr/local/lib/libMCGAL.so)

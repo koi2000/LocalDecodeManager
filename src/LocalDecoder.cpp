@@ -1,19 +1,30 @@
-#include "LocalDecoder.h"
-#include "BufferUtils.h"
+#include "./include/LocalDecoder.h"
+#include "./include/BufferUtils.h"
 #include <fstream>
 
-LocalDecoder::LocalDecoder(std::string path) {}
+LocalDecoder::LocalDecoder(std::string path) {
+    loadBuffer(path);
+    readBaseMesh();
+    readMeta();
+}
 
 void LocalDecoder::decode() {}
 
 void LocalDecoder::decodeOp(int groupId) {}
 
 void LocalDecoder::decodeOp(int groupId, int lod) {
-    if (compressRounds[groupId] < lod) {
-        std::cout << "out of boundary" << std::endl;
-    }
+    // if (compressRounds[groupId] < lod) {
+    //     std::cout << "out of boundary" << std::endl;
+    // }
     std::vector<int> fids = decodeFacetSymbolOp(groupId);
     std::vector<int> hids = decodeHalfedgeSymbolOp(groupId);
+    insertRemovedVertex(fids);
+    joinFacet(hids);
+    resetState();
+}
+
+void LocalDecoder::dumpToOFF(std::string path) {
+    mesh.dumpto(path);
 }
 
 void LocalDecoder::insertRemovedVertex(std::vector<int> fids) {
@@ -23,12 +34,38 @@ void LocalDecoder::insertRemovedVertex(std::vector<int> fids) {
     }
 }
 
-
-
 void LocalDecoder::joinFacet(std::vector<int> hids) {
     for (int i = 0; i < hids.size(); i++) {
         MCGAL::Halfedge* hit = MCGAL::contextPool.getHalfedgeByIndex(hids[i]);
         mesh.join_face(hit);
+    }
+}
+
+void LocalDecoder::readBoundary() {
+    std::queue<int> gateQueue;
+    gateQueue.push(seeds[0]->poolId);
+    while (!gateQueue.empty()) {
+        int hid = gateQueue.front();
+        MCGAL::Halfedge* h = MCGAL::contextPool.getHalfedgeByIndex(hid);
+        gateQueue.pop();
+        if (h->isProcessed()) {
+            continue;
+        }
+        h->setProcessed();
+
+        unsigned sym = readChar(buffer, dataOffset);
+        if (h->isBoundary()) {
+            h->setBoundary();
+        } else {
+             h->setNotBoundary();
+        }
+        MCGAL::Halfedge* hIt = h->next;
+        while (hIt->opposite != h) {
+            if (!hIt->isProcessed()) {
+                gateQueue.push(hIt->poolId);
+            }
+            hIt = hIt->opposite->next;
+        }
     }
 }
 
@@ -74,7 +111,7 @@ std::vector<int> LocalDecoder::decodeFacetSymbolOp(int groupId) {
             MCGAL::Halfedge* hOpp = hIt->opposite;
             // 对方没有被处理，且该边不是边界
             if (!hOpp->face->isProcessed() && !hOpp->isBoundary()) {
-                gateQueue.push(hOpp->poolId);
+                gateQueue.push(hOpp->face->poolId);
             }
             hIt = hIt->next;
         } while (hIt != h);
@@ -113,14 +150,14 @@ void LocalDecoder::readMeta() {
     compressRounds.resize(size);
     groupOffset.resize(size);
     // 读取seed
-    for (int i = 0; i < seeds.size(); i++) {
+    for (int i = 0; i < size; i++) {
         int st = readInt(buffer, dataOffset);
         int ed = readInt(buffer, dataOffset);
         int poolId1 = MCGAL::contextPool.vid2PoolId[st];
         int poolId2 = MCGAL::contextPool.vid2PoolId[ed];
         MCGAL::Vertex* v1 = MCGAL::contextPool.getVertexByIndex(poolId1);
         MCGAL::Vertex* v2 = MCGAL::contextPool.getVertexByIndex(poolId2);
-        for (int j = 0; j < v1->halfedges.size(); i++) {
+        for (int j = 0; j < v1->halfedges.size(); j++) {
             if (v1->halfedges[j]->end_vertex == v2) {
                 seeds.push_back(v1->halfedges[j]);
                 break;
@@ -131,6 +168,7 @@ void LocalDecoder::readMeta() {
     for (int i = 0; i < size; i++) {
         compressRounds[i] = readInt(buffer, dataOffset);
     }
+    readBoundary();
     // 读取每个group的offset
     for (int i = 0; i < size; i++) {
         groupOffset[i] = readInt(buffer, dataOffset);
