@@ -28,9 +28,9 @@ class LocalDecoder {
 
     std::vector<int> decodeHalfedgeSymbolOp(int groupId);
 
-    void insertRemovedVertex(std::vector<int> fids);
+    void insertRemovedVertex(std::vector<int>& fids);
 
-    void joinFacet(std::vector<int> hids);
+    void joinFacet(std::vector<int>& hids);
 
     void loadBuffer(std::string path);
 
@@ -43,6 +43,8 @@ class LocalDecoder {
     void readMeta();
 
     void resetState();
+
+     void resetBfsState();
 
   private:
     MCGAL::Mesh mesh;

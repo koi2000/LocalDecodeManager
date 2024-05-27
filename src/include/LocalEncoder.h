@@ -7,20 +7,21 @@
 #include <queue>
 #include <random>
 #include <set>
-#include <vector>
 #include <string>
+#include <vector>
 
-#define BUFFER_SIZE 10 * 1024 * 1024
+#define BUFFER_SIZE 100 * 1024 * 1024
 #define RANDOM_SEED 1035
 class LocalEncoder {
   public:
     LocalEncoder(std::string filename);
-    
+
     ~LocalEncoder();
 
     void encode();
 
     void dumpToFile(std::string filename);
+
   private:
     void dumpToBuffer();
 
@@ -41,6 +42,8 @@ class LocalEncoder {
     void markBoundry();
 
     void resetState();
+
+    void resetBfsState();
 
     bool isRemovable(MCGAL::Vertex* v);
 
@@ -68,9 +71,9 @@ class LocalEncoder {
     std::vector<int> groupOffset;
     int dataOffset = 0;
     // 数量为group数量
-    std::vector<std::deque<unsigned>> connectFaceSym;
-    std::vector<std::deque<unsigned>> connectEdgeSym;
-    std::vector<std::deque<MCGAL::Point>> geometrySym;
+    std::vector<std::vector<std::deque<unsigned>>> connectFaceSym;
+    std::vector<std::vector<std::deque<unsigned>>> connectEdgeSym;
+    std::vector<std::vector<std::deque<MCGAL::Point>>> geometrySym;
 };
 
 #endif
