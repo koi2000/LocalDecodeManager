@@ -16,12 +16,16 @@ void LocalDecoder::decodeOp(int groupId, int lod) {
     // if (compressRounds[groupId] < lod) {
     //     std::cout << "out of boundary" << std::endl;
     // }
-    std::vector<int> fids = decodeFacetSymbolOp(groupId);
-    resetBfsState();
-    std::vector<int> hids = decodeHalfedgeSymbolOp(groupId);
-    insertRemovedVertex(fids);
-    joinFacet(hids);
-    resetState();
+    int count = 0;
+    while (count < lod) {
+        std::vector<int> fids = decodeFacetSymbolOp(groupId);
+        resetBfsState();
+        std::vector<int> hids = decodeHalfedgeSymbolOp(groupId);
+        insertRemovedVertex(fids);
+        joinFacet(hids);
+        resetState();
+        count++;
+    }
 }
 
 void LocalDecoder::dumpToOFF(std::string path) {

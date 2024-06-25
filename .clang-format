@@ -1,3 +1,7 @@
+; find . -name "*.cpp" -exec clang-format -i {} +
+; find . -name "*.h" -exec clang-format -i {} +
+; find . -name "*.cu" -exec clang-format -i {} +
+; find . -name "*.cuh" -exec clang-format -i {} +
 ---
 # 语言: None, Cpp, Java, JavaScript, ObjC, Proto, TableGen, TextProto
 Language:	Cpp

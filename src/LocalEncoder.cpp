@@ -489,9 +489,9 @@ bool LocalEncoder::isRemovable(MCGAL::Vertex* v) {
             heh_oneRing.push_back(hit);
         }
         bool removable = !willViolateManifold(heh_oneRing);  // && arePointsCoplanar(vh_oneRing);
-        if (removable) {
-            return checkCompetition(v);
-        }
+        // if (removable) {
+        //     return checkCompetition(v);
+        // }
         return removable;
     }
     return false;

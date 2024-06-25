@@ -41,6 +41,14 @@ class LocalEncoder {
     // 为网格设置边界
     void markBoundry();
 
+    /**
+     * mergeBoundary和splitBoundary中需要很多的设计
+     * 目前想到的一个方案是在vertexRemove步骤中动态的去维护boundary
+     * 顶点移除时投票选举新的groupId，并重新划定boundary，新增边一定不会是boundary
+     * 分割的时候比较麻烦，需要记录一下面里哪个边可以是boundary
+    */
+    void mergeBoundary();
+
     void resetState();
 
     void resetBfsState();
