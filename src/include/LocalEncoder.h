@@ -38,6 +38,10 @@ class LocalEncoder {
     void encodeFacetSymbolOp(int groupId);
 
     void encodeHalfedgeSymbolOp(int groupId);
+
+    void encodeLocalBoundary(int groupId,std::vector<int>& boundarys);
+
+    bool boundaryPointRemovable(MCGAL::Vertex* v);
     // 为网格设置边界
     void markBoundry();
 
@@ -82,6 +86,8 @@ class LocalEncoder {
     std::vector<std::vector<std::deque<unsigned>>> connectFaceSym;
     std::vector<std::vector<std::deque<unsigned>>> connectEdgeSym;
     std::vector<std::vector<std::deque<MCGAL::Point>>> geometrySym;
+    // 
+    char* boundaryPointsBitmap = nullptr;
 };
 
 #endif

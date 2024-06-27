@@ -47,6 +47,7 @@ bool LocalEncoder::encodeOp(int groupId) {
     std::queue<int> gateQueue;
     gateQueue.push(seeds[groupId]->poolId);
     int removedCount = 0;
+    std::vector<int> boundarys;
     while (!gateQueue.empty()) {
         int hid = gateQueue.front();
         MCGAL::Halfedge* h = MCGAL::contextPool.getHalfedgeByIndex(hid);
@@ -73,6 +74,9 @@ bool LocalEncoder::encodeOp(int groupId) {
                 if (!hOpp->face->isConquered() && !hOpp->isBoundary() && !h->isBoundary()) {
                     gateQueue.push(hOpp->poolId);
                 }
+                if(hh->isBoundary()){
+                    boundarys.push_back(hOpp->poolId);
+                }
             } while ((hh = hh->next) != h);
         } else {
             removedCount++;
@@ -86,6 +90,7 @@ bool LocalEncoder::encodeOp(int groupId) {
         resetBfsState();
         encodeHalfedgeSymbolOp(groupId);
         resetBfsState();
+        encodeLocalBoundary(groupId,boundarys);
     }
     return removedCount != 0;
 }
@@ -184,6 +189,20 @@ void LocalEncoder::encodeHalfedgeSymbolOp(int groupId) {
         } while (hIt != h);
     }
     connectEdgeSym[groupId].push_back(halfedgeSym);
+}
+
+/**
+ * 对所有点集维护一个bitmap
+*/
+void LocalEncoder::encodeLocalBoundary(int groupId,std::vector<int>& boundarys) {
+    
+    for (int i = 0; i < boundarys.size(); i++) {
+        MCGAL::Halfedge* hit = MCGAL::contextPool.getHalfedgeByIndex(boundarys[i]);
+        if(hit->opposite->groupId>groupId){
+            boundaryPointRemovable(hit->vertex);
+        }
+    }
+    
 }
 
 void LocalEncoder::dumpToBuffer() {

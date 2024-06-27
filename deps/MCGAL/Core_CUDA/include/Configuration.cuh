@@ -1,0 +1,18 @@
+#ifndef CONFIGURATION_H
+#define CONFIGURATION_H
+namespace MCGAL {
+
+#define VERTEX_POOL_SIZE 7000 * 1024
+#define HALFEDGE_POOL_SIZE 8000 * 1024
+#define FACET_POOL_SIZE 7000 * 1024
+
+#define BUCKET_SIZE 4096
+#define SMALL_BUCKET_SIZE 32
+
+#define HALFEDGE_IN_VERTEX 24
+#define HALFEDGE_IN_FACE 24
+#define VERTEX_IN_FACE 24
+
+}  // namespace MCGAL
+
+#endif
