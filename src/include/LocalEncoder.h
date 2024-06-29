@@ -33,13 +33,15 @@ class LocalEncoder {
 
     void dumpHalfedgeSymbolToBuffer();
 
+    void dumpBoundryMergeMessageToBuffer();
+
     bool encodeOp(int groupId);
 
     void encodeFacetSymbolOp(int groupId);
 
     void encodeHalfedgeSymbolOp(int groupId);
 
-    void encodeLocalBoundary(int groupId,std::vector<int>& boundarys);
+    void encodeLocalBoundary(int groupId, std::vector<int>& boundarys);
 
     bool boundaryPointRemovable(MCGAL::Vertex* v);
     // 为网格设置边界
@@ -50,7 +52,7 @@ class LocalEncoder {
      * 目前想到的一个方案是在vertexRemove步骤中动态的去维护boundary
      * 顶点移除时投票选举新的groupId，并重新划定boundary，新增边一定不会是boundary
      * 分割的时候比较麻烦，需要记录一下面里哪个边可以是boundary
-    */
+     */
     void mergeBoundary();
 
     void resetState();
@@ -86,7 +88,11 @@ class LocalEncoder {
     std::vector<std::vector<std::deque<unsigned>>> connectFaceSym;
     std::vector<std::vector<std::deque<unsigned>>> connectEdgeSym;
     std::vector<std::vector<std::deque<MCGAL::Point>>> geometrySym;
-    // 
+    std::vector<std::deque<MCGAL::Point>> boundaryPoints;
+    std::vector<std::deque<std::pair<int, int>>> boundaryVidPair;
+    // boundary halfedge
+    std::vector<int> boundarys;
+    //
     char* boundaryPointsBitmap = nullptr;
 };
 

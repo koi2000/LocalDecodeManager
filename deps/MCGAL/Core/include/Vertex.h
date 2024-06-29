@@ -85,6 +85,12 @@ class Vertex : public Point {
         this->id = p.id;
     }
 
+    void setPoint(float x, float y, float z) {
+        this->v[0] = x;
+        this->v[1] = y;
+        this->v[2] = z;
+    }
+
     void setPoint(float x, float y, float z, int id) {
         this->v[0] = x;
         this->v[1] = y;

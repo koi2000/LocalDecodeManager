@@ -68,6 +68,30 @@ void Mesh::eraseVertexByPointer(Vertex* vertex) {
     }
 }
 
+MCGAL::Vertex* Mesh::halfedge_collapse(MCGAL::Halfedge* h) {
+    h->setRemoved();
+    h->opposite->face->setRemoved();
+    h->face->setRemoved();
+
+    MCGAL::Vertex* v1 = h->vertex;
+    MCGAL::Vertex* v2 = h->end_vertex;
+    v1->setPoint((v1->x() + v2->x()) / 2, (v1->y() + v2->y()) / 2, (v1->z() + v2->z()) / 2);
+    for (MCGAL::Halfedge* hit : v2->halfedges) {
+        if (hit->poolId == h->poolId || hit->opposite->poolId == h->poolId) {
+            continue;
+        }
+        hit->opposite->end_vertex = v1;
+        hit->vertex = v1;
+        v1->halfedges.push_back(hit);
+    }
+    for (MCGAL::Halfedge* hit : h->face->halfedges) {
+        hit->setRemoved();
+    }
+    for (MCGAL::Halfedge* hit : h->opposite->face->halfedges) {
+        hit->setRemoved();
+    }
+}
+
 Halfedge* Mesh::split_facet(Halfedge* h, Halfedge* g) {
     Facet* origin = h->face;
     // early expose
@@ -168,7 +192,7 @@ inline void Mesh::insert_tip(Halfedge* h, Halfedge* v) const {
 
 Halfedge* Mesh::find_prev(Halfedge* h) const {
     Halfedge* g = h;
-    while (g->next != h){
+    while (g->next != h) {
         g = g->next;
     }
     return g;

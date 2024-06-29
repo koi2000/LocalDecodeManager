@@ -5,6 +5,28 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
+			"name": "MCGAL_Test",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/build/MCGAL_Test",
+			"args": [
+				"/home/koi/mastercode/LocalDecodeManager/static/untitled.off"
+			],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}/build",
+			"environment": [],
+			"externalConsole": false,
+			"MIMode": "gdb",
+			"preLaunchTask": "CMake Build",
+			"setupCommands": [
+				{
+					"description": "Enable pretty-printing for gdb",
+					"text": "-enable-pretty-printing",
+					"ignoreFailures": true
+				}
+			]
+		},
+		{
 			"name": "LocalEncoderTest",
 			"type": "cppdbg",
 			"request": "launch",

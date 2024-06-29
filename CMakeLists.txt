@@ -7,11 +7,15 @@ project(LocalDecodeManager LANGUAGES  CXX C CUDA)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -Wno-unused-result -lpthread")
 
+# include_directories(src/include)
+# include_directories(deps/MCGAL/include)
 
 include_directories(
     ./include
     /usr/include
     /usr/local/include
+    src/include
+    deps/MCGAL/Core/include
     ${CUDA_INCLUDE_DIRS}
 )
 
@@ -30,11 +34,11 @@ file(GLOB_RECURSE LOCAL_COMPRESS_FILES
 find_package(OpenMP REQUIRED)
 find_package(CUDA REQUIRED)
 
-# add_executable(MCGAL_Test tools/MCGAL_Test.cpp)
+add_executable(MCGAL_Test tools/MCGAL_Test.cpp ${MINI_CGAL_FILES})
 # target_link_libraries(MCGAL_Test /usr/local/lib/libMCGAL.so)
 
-add_executable(LocalEncoderTest tools/LocalEncoderTest.cpp ${LOCAL_COMPRESS_FILES})
+add_executable(LocalEncoderTest tools/LocalEncoderTest.cpp ${LOCAL_COMPRESS_FILES} ${MINI_CGAL_FILES})
 # target_link_libraries(LocalEncoderTest /usr/local/lib/libMCGAL.so)
 
-add_executable(LocalDecoderTest tools/LocalDecoderTest.cpp ${LOCAL_COMPRESS_FILES})
+add_executable(LocalDecoderTest tools/LocalDecoderTest.cpp ${LOCAL_COMPRESS_FILES} ${MINI_CGAL_FILES})
 # target_link_libraries(LocalDecoderTest /usr/local/lib/libMCGAL.so)

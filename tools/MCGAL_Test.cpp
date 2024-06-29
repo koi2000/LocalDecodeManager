@@ -1,9 +1,12 @@
 #include "ContextPool.h"
 #include "Global.h"
+#include "core.h"
 #include <iostream>
 
 int main() {
-    MCGAL::Vertex* v = MCGAL::contextPool.allocateVertexFromPool();
-    std::cout << v->poolId << std::endl;
+    MCGAL::Mesh m;
+    m.loadOFF("/home/koi/mastercode/LocalDecodeManager/static/untitled.off");
+    m.halfedge_collapse(m.faces[0]->halfedges[0]);
+    m.dumpto("/home/koi/mastercode/LocalDecodeManager/static/collapse.off");
     return 0;
 }
