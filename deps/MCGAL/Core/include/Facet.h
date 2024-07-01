@@ -3,6 +3,7 @@
 #include "Point.h"
 #include <assert.h>
 #include <vector>
+#include <set>
 namespace MCGAL {
 class Point;
 class Vertex;
@@ -48,6 +49,7 @@ class Facet {
     void setGroupId(int gid) {
         this->groupId = gid;
     }
+    bool isDegenerate();
     Facet* clone();
     void reset(Halfedge* h);
     void reset(std::vector<Halfedge*>& hs);

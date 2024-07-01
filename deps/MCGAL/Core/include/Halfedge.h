@@ -12,6 +12,7 @@ class Halfedge {
     enum RemovedFlag { NotRemoved, Removed };
     enum BFSFlag { NotVisited, Visited };
     enum BoundaryFlag { NotBoundary, IsBoundary };
+    enum CollapseFlag { CantCollapse, CanCollapse };
 
     Flag flag = NotYetInQueue;
     Flag2 flag2 = Original;
@@ -19,6 +20,7 @@ class Halfedge {
     RemovedFlag removedFlag = NotRemoved;
     BFSFlag bfsFlag = NotVisited;
     BoundaryFlag boundaryFlag = NotBoundary;
+    CollapseFlag collapseFlag = CanCollapse;
 
   public:
     Halfedge(){};
@@ -53,12 +55,13 @@ class Halfedge {
         flag = NotYetInQueue;
         flag2 = Original;
         processedFlag = NotProcessed;
-        removedFlag = NotRemoved;
+        // removedFlag = NotRemoved;
         bfsFlag = NotVisited;
         horder = ~(unsigned long long)0;
         // horder.store(~(unsigned long long)0);
         level = 0;
         groupId = -1;
+        collapseFlag = CanCollapse;
     }
 
     void setGroupId(int gid) {
@@ -66,7 +69,6 @@ class Halfedge {
     }
 
     /* Flag 1 */
-
     inline void setInQueue() {
         flag = InQueue;
     }
@@ -104,6 +106,18 @@ class Halfedge {
 
     inline void setNotBoundary() {
         boundaryFlag = NotBoundary;
+    }
+
+    inline bool canCollapse() {
+        return collapseFlag == CanCollapse;
+    }
+
+    inline void setCanCollapse() {
+        collapseFlag = CanCollapse;
+    }
+
+    inline void setCantCollapse() {
+        collapseFlag = CantCollapse;
     }
 
     inline bool isProcessed() const {

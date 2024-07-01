@@ -70,13 +70,16 @@ void Mesh::eraseVertexByPointer(Vertex* vertex) {
 
 MCGAL::Vertex* Mesh::halfedge_collapse(MCGAL::Halfedge* h) {
     h->setRemoved();
-    h->opposite->face->setRemoved();
-    h->face->setRemoved();
+    h->opposite->setRemoved();
+    // h->opposite->face->setRemoved();
+    // h->face->setRemoved();
 
     MCGAL::Vertex* v1 = h->vertex;
     MCGAL::Vertex* v2 = h->end_vertex;
     v1->setPoint((v1->x() + v2->x()) / 2, (v1->y() + v2->y()) / 2, (v1->z() + v2->z()) / 2);
-    for (MCGAL::Halfedge* hit : v2->halfedges) {
+    // 更改所有v2中边的指向
+    for (int i = 0; i < v2->halfedges.size(); i++) {
+        MCGAL::Halfedge* hit = v2->halfedges[i];
         if (hit->poolId == h->poolId || hit->opposite->poolId == h->poolId) {
             continue;
         }
@@ -84,12 +87,52 @@ MCGAL::Vertex* Mesh::halfedge_collapse(MCGAL::Halfedge* h) {
         hit->vertex = v1;
         v1->halfedges.push_back(hit);
     }
-    for (MCGAL::Halfedge* hit : h->face->halfedges) {
-        hit->setRemoved();
+    // 删除v2持有的边
+    v2->halfedges.clear();
+    v2->halfedges.shrink_to_fit();
+    // 面中若只有三个边，则会发生退化
+    if (h->face->facet_degree() == 3) {
+        h->face->setRemoved();
+        MCGAL::Halfedge* hprev = find_prev(h);
+        hprev->opposite->opposite = h->next->opposite;
+        h->next->opposite->opposite = hprev->opposite;
+        // 退化面中的边需要被移除，并且其对应的顶点也需要移除边
+        for (MCGAL::Halfedge* hit : h->face->halfedges) {
+            hit->vertex->eraseHalfedgeByPointer(hit);
+            hit->setRemoved();
+        }
+    } else {
+        MCGAL::Halfedge* hprev = find_prev(h);
+        hprev->next = h->next;
     }
-    for (MCGAL::Halfedge* hit : h->opposite->face->halfedges) {
-        hit->setRemoved();
+    if (h->opposite->face->facet_degree() == 3) {
+        h->opposite->face->setRemoved();
+        MCGAL::Halfedge* hprev = find_prev(h->opposite);
+        hprev->opposite->opposite = h->opposite->next->opposite;
+        h->opposite->next->opposite->opposite = hprev->opposite;
+        for (MCGAL::Halfedge* hit : h->opposite->face->halfedges) {
+            hit->vertex->eraseHalfedgeByPointer(hit);
+            hit->setRemoved();
+        }
+    } else {
+        MCGAL::Halfedge* hprev = find_prev(h->opposite);
+        hprev->next = h->next;
     }
+    //
+    auto newEnd = std::remove_if(v1->halfedges.begin(), v1->halfedges.end(), [](MCGAL::Halfedge* hit) { return hit->isRemoved() || hit->vertex->poolId == hit->end_vertex->poolId; });
+    v1->halfedges.resize(std::distance(v1->halfedges.begin(), newEnd));
+    for (MCGAL::Halfedge* hit : v1->halfedges) {
+        if (hit->opposite == nullptr || hit->opposite->isRemoved()) {
+            printf("error");
+        }
+        hit->face->reset(hit);
+        assert(!hit->face->isDegenerate());
+        if (hit->face->isDegenerate()) {
+            printf("error");
+            hit->face->isRemoved();
+        }
+    }
+    return v1;
 }
 
 Halfedge* Mesh::split_facet(Halfedge* h, Halfedge* g) {

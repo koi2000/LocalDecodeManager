@@ -43,7 +43,7 @@ class LocalEncoder {
 
     void encodeLocalBoundary(int groupId, std::vector<int>& boundarys);
 
-    bool boundaryPointRemovable(MCGAL::Vertex* v);
+    bool boundaryRemovable(MCGAL::Halfedge* h);
     // 为网格设置边界
     void markBoundry();
 
@@ -68,6 +68,8 @@ class LocalEncoder {
     bool isConvex(const std::vector<MCGAL::Vertex*>& polygon) const;
 
     bool arePointsCoplanar(std::vector<MCGAL::Point>& points);
+
+    bool areHalfedgesCoplanar(std::vector<MCGAL::Halfedge*>& halfedges);
 
     MCGAL::Point crossProduct(const MCGAL::Point& a, const MCGAL::Point& b);
 

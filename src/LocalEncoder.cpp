@@ -191,32 +191,32 @@ void LocalEncoder::encodeHalfedgeSymbolOp(int groupId) {
 /**
  * 对所有点集维护一个bitmap
  */
-void LocalEncoder::encodeLocalBoundary(int groupId, std::vector<int>& boundarys) {
-    std::deque<std::pair<int, int>> vidq;
-    std::deque<MCGAL::Point> pointq;
-    for (int i = 0; i < boundarys.size(); i++) {
-        MCGAL::Halfedge* hit = MCGAL::contextPool.getHalfedgeByIndex(boundarys[i]);
-        if (hit->opposite->groupId < groupId) {
-            bool res = boundaryPointRemovable(hit->vertex);
-            if (res) {
-                MCGAL::Halfedge* newh = mesh.erase_center_vertex(hit);
-                newh->setGroupId(groupId);
-                // 移除中心顶点后需要重新划定边界
-                for (MCGAL::Halfedge* h : newh->face->halfedges) {
-                    if (h->face->groupId != h->opposite->face->groupId) {
-                        h->setBoundary();
-                        h->opposite->setBoundary();
-                    }
-                }
-                // 需要保存以下信息，并在内存中构建一个index
-                pointq.push_back(hit->vertex);
-                vidq.push_back({newh->vertex->id, newh->end_vertex->id});
-            }
-        }
-    }
-    boundaryPoints.push_back(pointq);
-    boundaryVidPair.push_back(vidq);
-}
+// void LocalEncoder::encodeLocalBoundary(int groupId, std::vector<int>& boundarys) {
+//     std::deque<std::pair<int, int>> vidq;
+//     std::deque<MCGAL::Point> pointq;
+//     for (int i = 0; i < boundarys.size(); i++) {
+//         MCGAL::Halfedge* hit = MCGAL::contextPool.getHalfedgeByIndex(boundarys[i]);
+//         if (hit->opposite->groupId < groupId) {
+//             bool res = boundaryPointRemovable(hit->vertex);
+//             if (res) {
+//                 MCGAL::Halfedge* newh = mesh.erase_center_vertex(hit);
+//                 newh->setGroupId(groupId);
+//                 // 移除中心顶点后需要重新划定边界
+//                 for (MCGAL::Halfedge* h : newh->face->halfedges) {
+//                     if (h->face->groupId != h->opposite->face->groupId) {
+//                         h->setBoundary();
+//                         h->opposite->setBoundary();
+//                     }
+//                 }
+//                 // 需要保存以下信息，并在内存中构建一个index
+//                 pointq.push_back(hit->vertex);
+//                 vidq.push_back({newh->vertex->id, newh->end_vertex->id});
+//             }
+//         }
+//     }
+//     boundaryPoints.push_back(pointq);
+//     boundaryVidPair.push_back(vidq);
+// }
 
 void LocalEncoder::dumpToBuffer() {
     writeBaseMesh();
@@ -231,7 +231,7 @@ void LocalEncoder::dumpToBuffer() {
     }
     resetBfsState();
     dumpBoundaryToBuffer();
-    dumpBoundryMergeMessageToBuffer();
+    // dumpBoundryMergeMessageToBuffer();
     dumpFacetSymbolToBuffer();
     // dumpHalfedgeSymbolToBuffer();
 }
@@ -269,34 +269,34 @@ void LocalEncoder::mergeBoundary() {
     std::deque<MCGAL::Point> pointq;
     for (int i = 0; i < boundarys.size(); i++) {
         MCGAL::Halfedge* hit = MCGAL::contextPool.getHalfedgeByIndex(boundarys[i]);
-        if (hit->opposite->face->groupId > hit->face->groupId) {
-            bool res = boundaryPointRemovable(hit->vertex);
-            if (res) {
-                MCGAL::Halfedge* newh = mesh.erase_center_vertex(hit);
-                newh->setGroupId(hit->face->groupId);
-                // 移除中心顶点后需要重新划定边界
-                for (MCGAL::Halfedge* h : newh->face->halfedges) {
-                    if (h->face->groupId != h->opposite->face->groupId) {
-                        if (!h->isBoundary()) {
-                            boundarys.push_back(h->poolId);
-                            h->setBoundary();
-                            h->opposite->setBoundary();
-                        } else {
-                            
-                        }
+        bool res = boundaryRemovable(hit);
+        if (res) {
+            MCGAL::Vertex* newv = mesh.halfedge_collapse(hit);
+            // 移除中心顶点后需要重新划定边界
+            for (MCGAL::Halfedge* h : newv->halfedges) {
+                if (h->isBoundary()) {
+                    h->setCantCollapse();
+                }
+
+                if (h->face->groupId != h->opposite->face->groupId) {
+                    if (!h->isBoundary()) {
+                        boundarys.push_back(h->poolId);
+                        h->setBoundary();
+                        h->opposite->setBoundary();
+                    } else {
                     }
                 }
-                // 需要保存以下信息，并在内存中构建一个index
-                pointq.push_back(hit->vertex);
-                vidq.push_back({newh->vertex->id, newh->end_vertex->id});
             }
+            // 需要保存以下信息，并在内存中构建一个index
+            pointq.push_back(hit->vertex);
+            // vidq.push_back({newh->vertex->id, newh->end_vertex->id});
         }
     }
     boundaryPoints.push_back(pointq);
     boundaryVidPair.push_back(vidq);
     auto boundaryEnd = std::remove_if(boundarys.begin(), boundarys.end(), [](int hid) {
         MCGAL::Halfedge* hit = MCGAL::contextPool.getHalfedgeByIndex(hid);
-        return hit->isRemoved();
+        return hit->isRemoved() || !hit->isBoundary();
     });
     boundarys.resize(std::distance(boundarys.begin(), boundaryEnd));
     // fix boundary
@@ -578,7 +578,7 @@ bool LocalEncoder::isRemovable(MCGAL::Vertex* v) {
             vh_oneRing.push_back(hit->opposite->vertex->point());
             heh_oneRing.push_back(hit);
         }
-        bool removable = !willViolateManifold(heh_oneRing);  // && arePointsCoplanar(vh_oneRing);
+        bool removable = !willViolateManifold(heh_oneRing) && arePointsCoplanar(vh_oneRing);
         // if (removable) {
         //     return checkCompetition(v);
         // }
@@ -587,28 +587,82 @@ bool LocalEncoder::isRemovable(MCGAL::Vertex* v) {
     return false;
 }
 
-bool LocalEncoder::boundaryPointRemovable(MCGAL::Vertex* v) {
+bool LocalEncoder::areHalfedgesCoplanar(std::vector<MCGAL::Halfedge*>& halfedges) {
+    if (halfedges.size() < 2)
+        return true;  // 少于两个线段认为共面
+
+    // 选择第一个线段的两个端点并计算方向向量
+    MCGAL::Vector v1 = MCGAL::Vector(halfedges[0]->end_vertex->point() - halfedges[0]->vertex->point());
+
+    // 选择第二个线段的两个端点并计算方向向量
+    MCGAL::Vector v2 = MCGAL::Vector(halfedges[1]->end_vertex->point() - halfedges[1]->vertex->point());
+
+    // 计算法向量
+    MCGAL::Vector n = v1.cross(v2);
+
+    // 判断所有点是否在同一平面上
+    for (size_t i = 2; i < halfedges.size(); ++i) {
+        MCGAL::Point P = halfedges[i]->vertex->point();
+        MCGAL::Vector vi = P - halfedges[0]->vertex->point();
+        if (n.dot(vi) != 0) {
+            return false;  // 点不在同一平面上
+        }
+    }
+
+    // 判断所有线段的方向向量是否平行于平面
+    for (size_t i = 2; i < halfedges.size(); ++i) {
+        MCGAL::Vector vj = halfedges[i]->end_vertex->point() - halfedges[i]->vertex->point();
+        if (n.dot(vj) != 0) {
+            return false;  // 线段不平行于平面
+        }
+    }
+
+    return true;
+}
+
+bool LocalEncoder::boundaryRemovable(MCGAL::Halfedge* h) {
     bool res = false;
-    for (MCGAL::Halfedge* hit : v->halfedges) {
-        if (hit->face->facet_degree() != 3) {
+    for (int i = 0; i < seeds.size(); i++) {
+        if (seeds[i]->poolId == h->poolId) {
             return false;
         }
     }
-    if (v->vertex_degree() > 2 && v->vertex_degree() <= 8) {
-        std::vector<MCGAL::Point> vh_oneRing;
-        std::vector<MCGAL::Halfedge*> heh_oneRing;
-        heh_oneRing.reserve(v->vertex_degree());
-        for (MCGAL::Halfedge* hit : v->halfedges) {
-            vh_oneRing.push_back(hit->opposite->vertex->point());
-            heh_oneRing.push_back(hit);
+    std::set<int> poolIds;
+    for (MCGAL::Halfedge* hit : h->face->halfedges) {
+        if (poolIds.count(hit->opposite->face->poolId)) {
+            return false;
         }
-        bool removable = !willViolateManifold(heh_oneRing);  // && arePointsCoplanar(vh_oneRing);
-        // if (removable) {
-        //     return checkCompetition(v);
-        // }
-        return removable;
+        poolIds.insert(hit->opposite->face->poolId);
     }
-    return false;
+    poolIds.clear();
+    for (MCGAL::Halfedge* hit : h->opposite->face->halfedges) {
+        if (poolIds.count(hit->opposite->face->poolId)) {
+            return false;
+        }
+        poolIds.insert(hit->opposite->face->poolId);
+    }
+
+    return h->canCollapse() && !h->isRemoved() && h->face->facet_degree() == 3 && h->opposite->face->facet_degree() == 3;
+    // for (MCGAL::Halfedge* hit : v->halfedges) {
+    //     if (hit->face->facet_degree() != 3) {
+    //         return false;
+    //     }
+    // }
+    // if (v->vertex_degree() > 2 && v->vertex_degree() <= 8) {
+    //     std::vector<MCGAL::Point> vh_oneRing;
+    //     std::vector<MCGAL::Halfedge*> heh_oneRing;
+    //     heh_oneRing.reserve(v->vertex_degree());
+    //     for (MCGAL::Halfedge* hit : v->halfedges) {
+    //         vh_oneRing.push_back(hit->opposite->vertex->point());
+    //         heh_oneRing.push_back(hit);
+    //     }
+    //     bool removable = !willViolateManifold(heh_oneRing);  // && arePointsCoplanar(vh_oneRing);
+    //     // if (removable) {
+    //     //     return checkCompetition(v);
+    //     // }
+    //     return removable;
+    // }
+    // return false;
 }
 
 MCGAL::Point LocalEncoder::crossProduct(const MCGAL::Point& a, const MCGAL::Point& b) {
@@ -620,18 +674,36 @@ MCGAL::Point LocalEncoder::crossProduct(const MCGAL::Point& a, const MCGAL::Poin
 }
 
 bool LocalEncoder::arePointsCoplanar(std::vector<MCGAL::Point>& points) {
-    if (points.size() < 3) {
-        std::cerr << "Error: Insufficient points to form a plane." << std::endl;
-        return false;
-    }
-    MCGAL::Point v1 = {points[1].x() - points[0].x(), points[1].y() - points[0].y(), points[1].z() - points[0].z()};
-    MCGAL::Point v2 = {points[2].x() - points[0].x(), points[2].y() - points[0].y(), points[2].z() - points[0].z()};
-    MCGAL::Point normal = crossProduct(v1, v2);
+    // if (points.size() < 3) {
+    //     std::cerr << "Error: Insufficient points to form a plane." << std::endl;
+    //     return false;
+    // }
+    // MCGAL::Point v1 = {points[1].x() - points[0].x(), points[1].y() - points[0].y(), points[1].z() - points[0].z()};
+    // MCGAL::Point v2 = {points[2].x() - points[0].x(), points[2].y() - points[0].y(), points[2].z() - points[0].z()};
+    // MCGAL::Point normal = crossProduct(v1, v2);
 
+    // for (size_t i = 3; i < points.size(); ++i) {
+    //     MCGAL::Point vecToPoint = {points[i].x() - points[0].x(), points[i].y() - points[0].y(), points[i].z() - points[0].z()};
+    //     MCGAL::Point cross = crossProduct(vecToPoint, normal);
+    //     if (fabs(cross.x()) > 0.0000001 || fabs(cross.y()) > 0.0000001 || fabs(cross.z()) > 0.0000001) {
+    //         return false;
+    //     }
+    // }
+    // return true;
+    if (points.size() < 4)
+        return true;  // 三个点总是共面的
+
+    // 选择前三个点，计算两个向量
+    MCGAL::Vector v1 = points[1] - points[0];
+    MCGAL::Vector v2 = points[2] - points[0];
+
+    // 计算法向量
+    MCGAL::Vector n = v1.cross(v2);
+
+    // 检查剩余点是否在平面上
     for (size_t i = 3; i < points.size(); ++i) {
-        MCGAL::Point vecToPoint = {points[i].x() - points[0].x(), points[i].y() - points[0].y(), points[i].z() - points[0].z()};
-        MCGAL::Point cross = crossProduct(vecToPoint, normal);
-        if (fabs(cross.x()) > 0.000001 || fabs(cross.y()) > 0.000001 || fabs(cross.z()) > 0.000001) {
+        MCGAL::Vector vi = points[i] - points[0];
+        if (std::abs(n.dot(vi)) > 1e-8) {  // 如果点不在平面上
             return false;
         }
     }

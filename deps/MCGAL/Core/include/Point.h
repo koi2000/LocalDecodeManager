@@ -3,6 +3,8 @@
 #include <assert.h>
 #include <stdexcept>
 namespace MCGAL {
+class Vector;
+
 class Point {
   public:
     Point() {
@@ -43,6 +45,11 @@ class Point {
         return v[2];
     }
 
+    // 两个点减法返回一个向量
+    Point operator-(const Point& p) const {
+        return Point(v[0] - p.x(), v[1] - p.y(), v[2] - p.z());
+    }
+
     float& operator[](int index) {
         if (index >= 0 && index < 3) {
             return v[index];
@@ -55,5 +62,31 @@ class Point {
     float v[3];
     int id;
 };
+
+// 定义向量类
+class Vector : public Point {
+  public:
+    double x, y, z;
+
+    Vector(double x, double y, double z) : x(x), y(y), z(z) {}
+    
+    Vector(Point p) : x(p.x()), y(p.y()), z(p.z()) {}
+
+    // 向量减法
+    Vector operator-(const Point& p) const {
+        return Vector(x - p.x(), y - p.y(), z - p.z());
+    }
+
+    // 向量叉积
+    Vector cross(const Vector& v) const {
+        return Vector(y * v.z - z * v.y, z * v.x - x * v.z, x * v.y - y * v.x);
+    }
+
+    // 向量点积
+    double dot(const Vector& v) const {
+        return x * v.x + y * v.y + z * v.z;
+    }
+};
+
 }  // namespace MCGAL
 #endif

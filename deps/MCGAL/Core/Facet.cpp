@@ -181,6 +181,7 @@ void Facet::reset(Halfedge* h) {
     Halfedge* ed = h;
     std::vector<Halfedge*> edges;
     do {
+        assert(st->next->vertex == st->end_vertex);
         edges.push_back(st);
         st = st->next;
     } while (st != ed);
@@ -217,6 +218,32 @@ void Facet::reset(std::vector<Halfedge*>& hs) {
         this->vertices.push_back(hs[i]->vertex);
         hs[i]->face = this;
     }
+}
+
+bool Facet::isDegenerate() {
+    MCGAL::Halfedge* hit = halfedges[0];
+    MCGAL::Halfedge* h = halfedges[0];
+    std::set<int> vpoolIds;
+    for (MCGAL::Vertex* vit : vertices) {
+        if (vpoolIds.count(vit->poolId)) {
+            return true;
+        }
+        vpoolIds.insert(vit->poolId);
+    }
+
+    std::set<int> poolIds;
+    // 检查是否出现了两边自环 或者 面结构被破坏
+    do {
+        if (poolIds.size() > 100) {
+            return true;
+        }
+        if (poolIds.count(hit->poolId)) {
+            return true;
+        }
+        poolIds.insert(hit->poolId);
+        hit = hit->next;
+    } while (hit != h);
+    return false;
 }
 
 void Facet::print() {
