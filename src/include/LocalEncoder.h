@@ -1,5 +1,6 @@
 #ifndef LOCALENCODER_H
 #define LOCALENCODER_H
+#include "EncodeBoundarySchema.h"
 #include "biops.h"
 #include "core.h"
 #include "syncbitops.h"
@@ -12,6 +13,7 @@
 
 #define BUFFER_SIZE 100 * 1024 * 1024
 #define RANDOM_SEED 1035
+
 class LocalEncoder {
   public:
     LocalEncoder(std::string filename);
@@ -33,7 +35,7 @@ class LocalEncoder {
 
     void dumpHalfedgeSymbolToBuffer();
 
-    void dumpBoundryMergeMessageToBuffer();
+    void dumpBoundryMergeMessageToBuffer(int prevDataOffset);
 
     bool encodeOp(int groupId);
 
@@ -90,12 +92,10 @@ class LocalEncoder {
     std::vector<std::vector<std::deque<unsigned>>> connectFaceSym;
     std::vector<std::vector<std::deque<unsigned>>> connectEdgeSym;
     std::vector<std::vector<std::deque<MCGAL::Point>>> geometrySym;
-    std::vector<std::deque<MCGAL::Point>> boundaryPoints;
-    std::vector<std::deque<std::pair<int, int>>> boundaryVidPair;
+    std::vector<std::deque<EncodeBoundarySchema>> boundarySchemas;
+    std::vector<int> schemaSizes;
     // boundary halfedge
     std::vector<int> boundarys;
-    //
-    char* boundaryPointsBitmap = nullptr;
 };
 
 #endif

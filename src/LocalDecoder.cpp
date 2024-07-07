@@ -16,15 +16,17 @@ void LocalDecoder::decodeOp(int groupId, int lod) {
     // if (compressRounds[groupId] < lod) {
     //     std::cout << "out of boundary" << std::endl;
     // }
-    int count = 0;
-    while (count < lod) {
-        std::vector<int> fids = decodeFacetSymbolOp(groupId);
+    int& currentLod = currentLods[groupId];
+    while (currentLod < lod) {
+        std::vector<MCGAL::Halfedge*> boundarys;
+        std::vector<int> fids = decodeFacetSymbolOp(groupId, boundarys);
         resetBfsState();
         std::vector<int> hids = decodeHalfedgeSymbolOp(groupId);
         insertRemovedVertex(fids);
         joinFacet(hids);
+        decodeBoundary(currentLod, boundarys);
         resetState();
-        count++;
+        currentLod++;
     }
 }
 
@@ -46,6 +48,54 @@ void LocalDecoder::joinFacet(std::vector<int>& hids) {
         MCGAL::Halfedge* hit = MCGAL::contextPool.getHalfedgeByIndex(hids[i]);
         if (!hit->isRemoved()) {
             mesh.join_face(hit);
+        }
+    }
+}
+
+void LocalDecoder::decodeBoundary(int lod, std::vector<MCGAL::Halfedge*> boundarys) {
+    buildSchemaIndex(lod);
+    std::map<int, EncodeBoundarySchema> lodSchema = boundaryIndexes[lod];
+    for (int i = 0; i < boundarys.size(); i++) {
+        if (lodSchema.count(boundarys[i]->vertex->id)) {
+            EncodeBoundarySchema& schema = lodSchema[boundarys[i]->vertex->id];
+            MCGAL::Vertex* v = boundarys[i]->vertex;
+            // from bitmap build conn
+            char* bitmap = schema.getNeedMoved();
+            std::vector<int> sortedArray;
+            std::map<int, int> order2id;
+            for (MCGAL::Halfedge* h : v->halfedges) {
+                sortedArray.push_back(h->vertex->id);
+            }
+            std::sort(sortedArray.begin(), sortedArray.end());
+            for (int i = 0; i < sortedArray.size(); i++) {
+                order2id[i] = sortedArray[i];
+            }
+            std::vector<MCGAL::Halfedge*> conn;
+            for (int j = 0; j < schema.getNeedMovedSize(); j++) {
+                if (getBit(bitmap, j)) {
+                    int vid = order2id[j];
+                    int poolId = MCGAL::contextPool.vid2PoolId[vid];
+                    conn.push_back(MCGAL::contextPool.getHalfedgeByIndex(poolId));
+                }
+            }
+
+            MCGAL::Halfedge* newh = mesh.vertex_split(boundarys[i]->vertex, schema.getP(), conn);
+            newh->face->setGroupId(schema.getGroupId1());
+            newh->opposite->face->setGroupId(schema.getGroupId2());
+
+            // remark boundary
+            for (MCGAL::Halfedge* hit : newh->vertex->halfedges) {
+                if (hit->face->groupId != hit->opposite->face->groupId) {
+                    hit->setBoundary();
+                    hit->opposite->setBoundary();
+                }
+            }
+            for (MCGAL::Halfedge* hit : newh->end_vertex->halfedges) {
+                if (hit->face->groupId != hit->opposite->face->groupId) {
+                    hit->setBoundary();
+                    hit->opposite->setBoundary();
+                }
+            }
         }
     }
 }
@@ -78,10 +128,11 @@ void LocalDecoder::readBoundary() {
     }
 }
 
-std::vector<int> LocalDecoder::decodeFacetSymbolOp(int groupId) {
+std::vector<int> LocalDecoder::decodeFacetSymbolOp(int groupId, std::vector<MCGAL::Halfedge*>& boundarys) {
     std::queue<int> gateQueue;
     gateQueue.push(seeds[groupId]->face->poolId);
     std::vector<int> fids;
+
     while (!gateQueue.empty()) {
         int fid = gateQueue.front();
         MCGAL::Facet* f = MCGAL::contextPool.getFacetByIndex(fid);
@@ -119,6 +170,9 @@ std::vector<int> LocalDecoder::decodeFacetSymbolOp(int groupId) {
         f->setProcessedFlag();
         do {
             MCGAL::Halfedge* hOpp = hIt->opposite;
+            if (hOpp->isBoundary()) {
+                boundarys.push_back(hIt);
+            }
             // 对方没有被处理，且该边不是边界
             if (!hOpp->face->isProcessed() && !hOpp->isBoundary()) {
                 gateQueue.push(hOpp->face->poolId);
@@ -181,6 +235,7 @@ void LocalDecoder::readMeta() {
     // 读取group数量
     int size = readInt(buffer, dataOffset);
     compressRounds.resize(size);
+    currentLods = std::vector<int>(size, 0);
     groupOffset.resize(size);
     // 读取seed
     for (int i = 0; i < size; i++) {
@@ -203,10 +258,39 @@ void LocalDecoder::readMeta() {
     }
     readBoundary();
     resetBfsState();
+    readSchemaOffset();
     // 读取每个group的offset
     for (int i = 0; i < size; i++) {
         groupOffset[i] = readInt(buffer, dataOffset);
     }
+}
+
+void LocalDecoder::readSchemaOffset() {
+    int schemaSize = readInt(buffer, dataOffset);
+    boundaryIndexes.resize(schemaSize);
+    for (int i = 0; i < schemaSize; i++) {
+        schemaOffsets.push_back(readInt(buffer, dataOffset));
+    }
+}
+
+void LocalDecoder::buildSchemaIndex(int lod) {
+    std::map<int, EncodeBoundarySchema>& index = boundaryIndexes[lod];
+    if (!index.empty()) {
+        return;
+    }
+    int start = schemaOffsets[lod];
+    int end = offsetEnd;
+    if (lod != 10) {
+        end = schemaOffsets[lod + 1];
+    }
+    std::vector<EncodeBoundarySchema> schemas;
+    while (start < end) {
+        EncodeBoundarySchema schema;
+        schema.loadEncodeBoundarySchema(buffer, start);
+        schemas.push_back(schema);
+        index[schema.getVid()] = schema;
+    }
+    boundaryIndexes[lod] = index;
 }
 
 void LocalDecoder::resetState() {
@@ -283,6 +367,7 @@ void LocalDecoder::loadBuffer(std::string path) {
     buffer = new char[len2];
     memset(buffer, 0, len2);
     fin.read(buffer, len2);
+    offsetEnd = len2;
 }
 
 void LocalDecoder::resetBfsState() {

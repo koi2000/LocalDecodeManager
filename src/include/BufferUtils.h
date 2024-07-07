@@ -2,8 +2,19 @@
 #define BUFFER_UTILS_H
 #include "core.h"
 #include <assert.h>
+#include <cstring>  // For memcpy
 #include <stdint.h>
 #include <unistd.h>
+
+static void writeCharPointer(char* buffer, int& dataOffset, char* data, int size) {
+    std::memcpy(buffer + dataOffset, data, size * sizeof(char));
+    dataOffset += size;
+}
+
+static void readCharPointer(char* buffer, int& dataOffset, char* data, int size) {
+    std::memcpy(data, buffer + dataOffset, size * sizeof(char));
+    dataOffset += size;
+}
 
 // Write a given number of bits in a buffer.
 static void writeBits(uint32_t data, unsigned i_nbBits, char* p_dest, unsigned& i_bitOffset, size_t& offset) {

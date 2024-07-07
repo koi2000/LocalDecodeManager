@@ -22,3 +22,21 @@ static inline int test_bit(int nr, volatile const unsigned long* addr) {
 
     return oldbit;
 }
+
+static inline void setBit(char* bitmap, int bitIndex) {
+    int byteIndex = bitIndex / 8;
+    char bitMask = 1 << (bitIndex % 8);
+    bitmap[byteIndex] |= bitMask;
+}
+
+static inline void clearBit(char* bitmap, int bitIndex) {
+    int byteIndex = bitIndex / 8;
+    char bitMask = ~(1 << (bitIndex % 8));
+    bitmap[byteIndex] &= bitMask;
+}
+
+static inline bool getBit(const char* bitmap, int bitIndex) {
+    int byteIndex = bitIndex / 8;
+    char bitMask = 1 << (bitIndex % 8);
+    return (bitmap[byteIndex] & bitMask) != 0;
+}

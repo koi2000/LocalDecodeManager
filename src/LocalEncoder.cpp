@@ -1,6 +1,7 @@
 #include "./include/LocalEncoder.h"
 #include "./include/BufferUtils.h"
 #include <fstream>
+#include <map>
 
 inline bool cmpForder(MCGAL::Facet* f1, MCGAL::Facet* f2) {
     return f1->forder < f2->forder;
@@ -32,10 +33,16 @@ void LocalEncoder::encode() {
     mesh.dumpto(path);
     resetState();
     for (int j = 0; j < 10; j++) {
+        /**
+         * 先mergeboundary再执行具体的encode步骤
+         * 解压缩时先decode再decode boundary
+         */
         for (int i = 0; i < seeds.size(); i++) {
             int result = encodeOp(i);
         }
-        mergeBoundary();
+        if (j != 9) {
+            mergeBoundary();
+        }
         resetState();
         char path[256];
         sprintf(path, "./gisdata/decompressed_%d.mesh.off", j);
@@ -231,9 +238,13 @@ void LocalEncoder::dumpToBuffer() {
     }
     resetBfsState();
     dumpBoundaryToBuffer();
-    // dumpBoundryMergeMessageToBuffer();
+    // 先让meta占据一部分位置，后续填充
+    int prevDataOffset = dataOffset;
+    dataOffset += schemaSizes.size() * sizeof(int) + sizeof(int);
     dumpFacetSymbolToBuffer();
-    // dumpHalfedgeSymbolToBuffer();
+    int afterDataOffset = dataOffset;
+    dumpBoundryMergeMessageToBuffer(prevDataOffset);
+    dumpHalfedgeSymbolToBuffer();
 }
 
 void LocalEncoder::dumpBoundaryToBuffer() {
@@ -264,57 +275,90 @@ void LocalEncoder::dumpBoundaryToBuffer() {
     }
 }
 
+/**
+ * encode boundary格式
+ * vid    合并所得点的id
+ * point  被删除的点全部信息
+ * bitmap 连接信息
+ * bitmap 哪些是原来的boundary
+ */
 void LocalEncoder::mergeBoundary() {
-    std::deque<std::pair<int, int>> vidq;
-    std::deque<MCGAL::Point> pointq;
+    std::deque<EncodeBoundarySchema> schemaQueue;
+    int schemaSize = 0;
     for (int i = 0; i < boundarys.size(); i++) {
         MCGAL::Halfedge* hit = MCGAL::contextPool.getHalfedgeByIndex(boundarys[i]);
         bool res = boundaryRemovable(hit);
         if (res) {
+            EncodeBoundarySchema schema;
+            schema.setVid(hit->vertex->id);
+            schema.setP(hit->end_vertex->point());
+            schema.setGroupId1(hit->face->groupId);
+            schema.setGroupId2(hit->opposite->face->groupId);
+            std::set<int> connvid;
+            for (MCGAL::Halfedge* hit : hit->end_vertex->halfedges) {
+                connvid.insert(hit->end_vertex->id);
+            }
             MCGAL::Vertex* newv = mesh.halfedge_collapse(hit);
+            int bitmapSize = newv->halfedges.size() / 8 + 1;
+            char* bitmap = new char[bitmapSize];
+            std::vector<int> sortedArray;
+            std::map<int, int> id2order;
             // 移除中心顶点后需要重新划定边界
             for (MCGAL::Halfedge* h : newv->halfedges) {
+                sortedArray.push_back(h->end_vertex->id);
                 if (h->isBoundary()) {
                     h->setCantCollapse();
+                    h->opposite->setCantCollapse();
                 }
-
                 if (h->face->groupId != h->opposite->face->groupId) {
                     if (!h->isBoundary()) {
                         boundarys.push_back(h->poolId);
                         h->setBoundary();
+                        h->setCantCollapse();
+                        h->opposite->setCantCollapse();
                         h->opposite->setBoundary();
                     } else {
                     }
                 }
             }
-            // 需要保存以下信息，并在内存中构建一个index
-            pointq.push_back(hit->vertex);
-            // vidq.push_back({newh->vertex->id, newh->end_vertex->id});
+            std::sort(sortedArray.begin(), sortedArray.end());
+            for (int i = 0; i < sortedArray.size(); i++) {
+                id2order[sortedArray[i]] = i;
+            }
+            for (MCGAL::Halfedge* h : newv->halfedges) {
+                if (connvid.count(h->end_vertex->id)) {
+                    setBit(bitmap, id2order[h->end_vertex->id]);
+                }
+            }
+            schemaSize += (SCHEMA_FIXED_LENGTH + bitmapSize);
+            schema.setNeedMovedSize(bitmapSize);
+            schema.setNeedMoved(bitmap);
+            schemaQueue.push_back(schema);
         }
     }
-    boundaryPoints.push_back(pointq);
-    boundaryVidPair.push_back(vidq);
     auto boundaryEnd = std::remove_if(boundarys.begin(), boundarys.end(), [](int hid) {
         MCGAL::Halfedge* hit = MCGAL::contextPool.getHalfedgeByIndex(hid);
         return hit->isRemoved() || !hit->isBoundary();
     });
     boundarys.resize(std::distance(boundarys.begin(), boundaryEnd));
     // fix boundary
+    boundarySchemas.push_back(schemaQueue);
+    schemaSizes.push_back(schemaSize);
 }
 
-void LocalEncoder::dumpBoundryMergeMessageToBuffer() {
-    std::vector<int> offsets(boundaryPoints.size());
-    for (int i = 0; i < boundaryPoints.size(); i++) {
-        offsets[i] = boundaryPoints[i].size();
+void LocalEncoder::dumpBoundryMergeMessageToBuffer(int prevDataOffset) {
+    // 计算每个LOD中boundary信息的大小
+    writeInt(buffer, prevDataOffset, schemaSizes.size());
+    std::vector<int> schemaIndex(schemaSizes);
+    std::partial_sum(schemaIndex.begin(), schemaIndex.end(), schemaIndex.begin());
+    std::transform(schemaIndex.begin(), schemaIndex.end(), schemaIndex.begin(), [&](int value) { return value + dataOffset; });
+    for (int i = 0; i < schemaIndex.size(); i++) {
+        writeInt(buffer, prevDataOffset, schemaIndex[i]);
     }
-    for (int i = 0; i < boundaryPoints.size(); i++) {
-        writeInt(buffer, dataOffset, offsets[i]);
-    }
-    for (int i = 0; i < boundaryPoints.size(); i++) {
-        for (int j = 0; j < boundaryPoints[i].size(); j++) {
-            writeInt(buffer, dataOffset, boundaryVidPair[i][j].first);
-            writeInt(buffer, dataOffset, boundaryVidPair[i][j].second);
-            writePoint(buffer, dataOffset, boundaryPoints[i][j]);
+
+    for (size_t i = 0; i < boundarySchemas.size(); i++) {
+        for (size_t j = 0; j < boundarySchemas[i].size(); j++) {
+            boundarySchemas[i][j].dumpEncodeBoundarySchema(buffer, dataOffset);
         }
     }
 }
@@ -764,15 +808,27 @@ void LocalEncoder::writeBaseMesh() {
     writeInt(buffer, dataOffset, i_nbFacesBaseMesh);
     int id = 0;
     for (MCGAL::Vertex* vit : mesh.vertices) {
+        if (vit->isRemoved()) {
+            continue;
+        }
         MCGAL::Point point = vit->point();
         writePoint(buffer, dataOffset, point);
         vit->setVid(id++);
     }
     for (MCGAL::Facet* fit : mesh.faces) {
+        if (fit->isRemoved()) {
+            continue;
+        }
         unsigned i_faceDegree = fit->facet_degree();
         writeInt(buffer, dataOffset, i_faceDegree);
-        for (MCGAL::Halfedge* hit : fit->halfedges) {
-            writeInt(buffer, dataOffset, hit->vertex->getVid());
-        }
+        MCGAL::Halfedge* st = fit->halfedges[0];
+        MCGAL::Halfedge* ed = st;
+        do {
+            writeInt(buffer, dataOffset, st->vertex->getVid());
+            st = st->next;
+        } while (st != ed);
+        // for (MCGAL::Halfedge* hit : fit->halfedges) {
+        //     writeInt(buffer, dataOffset, hit->vertex->getVid());
+        // }
     }
 }

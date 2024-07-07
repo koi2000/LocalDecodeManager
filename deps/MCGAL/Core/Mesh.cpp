@@ -68,6 +68,9 @@ void Mesh::eraseVertexByPointer(Vertex* vertex) {
     }
 }
 
+/**
+ * 不完全版本，可能会导致退化面
+ */
 MCGAL::Vertex* Mesh::halfedge_collapse(MCGAL::Halfedge* h) {
     h->setRemoved();
     h->opposite->setRemoved();
@@ -87,6 +90,7 @@ MCGAL::Vertex* Mesh::halfedge_collapse(MCGAL::Halfedge* h) {
         hit->vertex = v1;
         v1->halfedges.push_back(hit);
     }
+    v2->setRemoved();
     // 删除v2持有的边
     v2->halfedges.clear();
     v2->halfedges.shrink_to_fit();
@@ -121,6 +125,10 @@ MCGAL::Vertex* Mesh::halfedge_collapse(MCGAL::Halfedge* h) {
     //
     auto newEnd = std::remove_if(v1->halfedges.begin(), v1->halfedges.end(), [](MCGAL::Halfedge* hit) { return hit->isRemoved() || hit->vertex->poolId == hit->end_vertex->poolId; });
     v1->halfedges.resize(std::distance(v1->halfedges.begin(), newEnd));
+    // std::sort(v1->halfedges.begin(), v1->halfedges.end(), [](MCGAL::Halfedge* v1, MCGAL::Halfedge* v2) { return v1->poolId < v2->poolId; });
+    std::sort(v1->halfedges.begin(), v1->halfedges.end());
+    newEnd = std::unique(v1->halfedges.begin(), v1->halfedges.end());
+    v1->halfedges.resize(std::distance(v1->halfedges.begin(), newEnd));
     for (MCGAL::Halfedge* hit : v1->halfedges) {
         if (hit->opposite == nullptr || hit->opposite->isRemoved()) {
             printf("error");
@@ -133,6 +141,72 @@ MCGAL::Vertex* Mesh::halfedge_collapse(MCGAL::Halfedge* h) {
         }
     }
     return v1;
+}
+
+/**
+ * 半边折叠的逆操作
+ * @param v 需要被split的点
+ * @param p 需要被新插入的边
+ * @param conn 需要被连接到新点的边
+ */
+MCGAL::Halfedge* Mesh::vertex_split(MCGAL::Vertex* v, MCGAL::Point p, std::vector<Halfedge*> conn, int vid1, int vid2) {
+    // TODO: 完善该方法
+    MCGAL::Vertex* vnew = MCGAL::contextPool.allocateVertexFromPool(p);
+    MCGAL::Halfedge* newh = MCGAL::contextPool.allocateHalfedgeFromPool(v, vnew);
+    MCGAL::Halfedge* onewh = MCGAL::contextPool.allocateHalfedgeFromPool(vnew, v);
+    MCGAL::Halfedge* split1 = nullptr;
+    MCGAL::Halfedge* split2 = nullptr;
+    std::set<int> poolIds;
+    // 将本该属于vnew的边还回去
+    for (MCGAL::Halfedge* hit : conn) {
+        if (hit->end_vertex->id == vid1) {
+            split1 = hit;
+            continue;
+        } else if (hit->end_vertex->id == vid2) {
+            split2 = hit;
+            continue;
+        }
+        poolIds.insert(hit->end_vertex->poolId);
+        hit->vertex = vnew;
+        hit->opposite->end_vertex = vnew;
+    }
+
+    // 删除v中不属于他的边
+    for (auto it = v->halfedges.begin(); it != v->halfedges.end();) {
+        if (poolIds.count((*it)->poolId)) {
+            it = v->halfedges.erase(it);
+        } else {
+            it++;
+        }
+    }
+    MCGAL::Halfedge* hit1 = MCGAL::contextPool.allocateHalfedgeFromPool(split1->end_vertex, vnew);
+    MCGAL::Halfedge* ohit1 = MCGAL::contextPool.allocateHalfedgeFromPool(vnew, split1->end_vertex);
+    MCGAL::Halfedge* hit2 = MCGAL::contextPool.allocateHalfedgeFromPool(split2->end_vertex, vnew);
+    MCGAL::Halfedge* ohit2 = MCGAL::contextPool.allocateHalfedgeFromPool(vnew, split2->end_vertex);
+    MCGAL::Halfedge* split1_prev = find_prev(split1);
+    hit1->next = split1->next;
+    split1_prev->next = hit1;
+    ohit1->next = onewh;
+    onewh->next = split1;
+    split1->next = ohit1;
+
+    MCGAL::Halfedge* split2_prev = find_prev(split2);
+    hit2->next = split2->next;
+    split2_prev->next = hit2;
+    ohit2->next = onewh;
+    onewh->next = split2;
+    split2->next = ohit2;
+    MCGAL::Facet* f1 = MCGAL::contextPool.allocateFaceFromPool();
+    f1->reset(split1);
+
+    MCGAL::Facet* f2 = MCGAL::contextPool.allocateFaceFromPool();
+    f2->reset(split2);
+    for (MCGAL::Halfedge* hit : v->halfedges) {
+        hit->face->reset(hit);
+    }
+    for (MCGAL::Halfedge* hit : vnew->halfedges) {
+        hit->face->reset(hit);
+    }
 }
 
 Halfedge* Mesh::split_facet(Halfedge* h, Halfedge* g) {

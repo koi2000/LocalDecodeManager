@@ -1,14 +1,15 @@
 #ifndef MESH_H
 #define MESH_H
-#include <vector>
 #include "Configuration.h"
-#include <string>
 #include <algorithm>
 #include <stdlib.h>
+#include <string>
+#include <vector>
 namespace MCGAL {
 class Vertex;
 class Halfedge;
 class Facet;
+class Point;
 class Mesh {
   public:
     // std::unordered_set<Vertex*, Vertex::Hash, Vertex::Equal> vertices;
@@ -77,6 +78,10 @@ class Mesh {
     }
 
     MCGAL::Vertex* halfedge_collapse(MCGAL::Halfedge* h);
+
+    // MCGAL::Halfedge* vertex_split(MCGAL::Vertex* v);
+
+    MCGAL::Halfedge* vertex_split(MCGAL::Vertex* v, MCGAL::Point p, std::vector<Halfedge*> conn, int vid1, int vid2);
 
     Halfedge* split_facet(Halfedge* h, Halfedge* g);
 

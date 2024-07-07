@@ -1,9 +1,11 @@
 #ifndef LOCALDECODER_H
 #define LOCALDECODER_H
+#include "EncodeBoundarySchema.h"
 #include "biops.h"
 #include "core.h"
 #include "syncbitops.h"
 #include <cstring>
+#include <map>
 #include <queue>
 #include <random>
 #include <set>
@@ -24,7 +26,7 @@ class LocalDecoder {
     void dumpToOFF(std::string path);
 
   private:
-    std::vector<int> decodeFacetSymbolOp(int groupId);
+    std::vector<int> decodeFacetSymbolOp(int groupId, std::vector<MCGAL::Halfedge*>& boundarys);
 
     std::vector<int> decodeHalfedgeSymbolOp(int groupId);
 
@@ -44,7 +46,15 @@ class LocalDecoder {
 
     void resetState();
 
-     void resetBfsState();
+    void resetBfsState();
+
+    void readBoundaryCollapseMessage();
+
+    void readSchemaOffset();
+
+    void buildSchemaIndex(int lod);
+
+    void decodeBoundary(int lod, std::vector<MCGAL::Halfedge*> boundarys);
 
   private:
     MCGAL::Mesh mesh;
@@ -53,6 +63,10 @@ class LocalDecoder {
     std::vector<MCGAL::Halfedge*> seeds;
     std::vector<int> groupOffset;
     int dataOffset = 0;
+    std::vector<int> schemaOffsets;
+    std::vector<std::map<int, EncodeBoundarySchema>> boundaryIndexes;
+    std::vector<int> currentLods;
+    int offsetEnd = 0;
 };
 
 #endif

@@ -168,6 +168,11 @@ class Halfedge {
     inline bool isVisited() {
         return bfsFlag == Visited;
     }
+
+    // 自定义的比较函数，只比较名字
+    bool operator==(const MCGAL::Halfedge& other) const {
+        return poolId == other.poolId;
+    }
 };
 }  // namespace MCGAL
 
