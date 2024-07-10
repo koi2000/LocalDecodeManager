@@ -80,6 +80,8 @@ void EncodeBoundarySchema::dumpEncodeBoundarySchema(char* buffer, int& dataOffse
     writePoint(buffer, dataOffset, p);
     writeInt(buffer, dataOffset, groupId1);
     writeInt(buffer, dataOffset, groupId2);
+    writeInt(buffer, dataOffset, vid1);
+    writeInt(buffer, dataOffset, vid2);
     writeInt(buffer, dataOffset, needMovedSize);
     writeCharPointer(buffer, dataOffset, needMoved, needMovedSize);
 }
@@ -89,6 +91,8 @@ void EncodeBoundarySchema::loadEncodeBoundarySchema(char* buffer, int& dataOffse
     p = readPoint(buffer, dataOffset);
     groupId1 = readInt(buffer, dataOffset);
     groupId2 = readInt(buffer, dataOffset);
+    vid1 = readInt(buffer, dataOffset);
+    vid2 = readInt(buffer, dataOffset);
     needMovedSize = readInt(buffer, dataOffset);
     needMoved = new char[needMovedSize];
     readCharPointer(buffer, dataOffset, needMoved, needMovedSize);

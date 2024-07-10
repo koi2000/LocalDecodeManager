@@ -17,35 +17,27 @@ class EncodeBoundarySchema {
         // delete needMoved;
     }
 
-    // Getter and Setter for vid
     int getVid() const;
     void setVid(int vid);
 
-    // Getter and Setter for p (MCGAL::Point)
     MCGAL::Point getP() const;
     void setP(const MCGAL::Point& p);
 
-    // Getter and Setter for groupId1
     int getGroupId1() const;
     void setGroupId1(int groupId1);
 
-    // Getter and Setter for groupId2
     int getGroupId2() const;
     void setGroupId2(int groupId2);
 
-    // Getter and Setter for vId1
     int getVid1() const;
     void setVid1(int vid1);
 
-    // Getter and Setter for vId2
     int getVid2() const;
     void setVid2(int vid2);
 
-    // Getter and Setter for needMovedSize
     int getNeedMovedSize() const;
     void setNeedMovedSize(int needMovedSize);
 
-    // Getter and Setter for needMoved
     char* getNeedMoved() const;
     void setNeedMoved(char* needMoved);
 

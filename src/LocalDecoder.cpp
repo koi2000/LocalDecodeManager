@@ -24,7 +24,7 @@ void LocalDecoder::decodeOp(int groupId, int lod) {
         std::vector<int> hids = decodeHalfedgeSymbolOp(groupId);
         insertRemovedVertex(fids);
         joinFacet(hids);
-        decodeBoundary(currentLod, boundarys);
+        // decodeBoundary(currentLod, boundarys);
         resetState();
         currentLod++;
     }
@@ -79,7 +79,7 @@ void LocalDecoder::decodeBoundary(int lod, std::vector<MCGAL::Halfedge*> boundar
                 }
             }
 
-            MCGAL::Halfedge* newh = mesh.vertex_split(boundarys[i]->vertex, schema.getP(), conn);
+            MCGAL::Halfedge* newh = mesh.vertex_split(boundarys[i]->vertex, schema.getP(), conn, schema.getVid1(), schema.getVid2());
             newh->face->setGroupId(schema.getGroupId1());
             newh->opposite->face->setGroupId(schema.getGroupId2());
 
@@ -132,7 +132,7 @@ std::vector<int> LocalDecoder::decodeFacetSymbolOp(int groupId, std::vector<MCGA
     std::queue<int> gateQueue;
     gateQueue.push(seeds[groupId]->face->poolId);
     std::vector<int> fids;
-
+    std::set<int> poolIdSet;
     while (!gateQueue.empty()) {
         int fid = gateQueue.front();
         MCGAL::Facet* f = MCGAL::contextPool.getFacetByIndex(fid);
@@ -171,7 +171,7 @@ std::vector<int> LocalDecoder::decodeFacetSymbolOp(int groupId, std::vector<MCGA
         do {
             MCGAL::Halfedge* hOpp = hIt->opposite;
             if (hOpp->isBoundary()) {
-                boundarys.push_back(hIt);
+                poolIdSet.insert(hOpp->poolId);
             }
             // 对方没有被处理，且该边不是边界
             if (!hOpp->face->isProcessed() && !hOpp->isBoundary()) {
@@ -179,6 +179,9 @@ std::vector<int> LocalDecoder::decodeFacetSymbolOp(int groupId, std::vector<MCGA
             }
             hIt = hIt->next;
         } while (hIt != h);
+    }
+    for (int id : poolIdSet) {
+        boundarys.push_back(MCGAL::contextPool.getHalfedgeByIndex(id));
     }
     return fids;
 }

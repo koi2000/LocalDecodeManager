@@ -16,6 +16,9 @@ include_directories(
     /usr/local/include
     src/include
     deps/MCGAL/Core/include
+
+    /usr/local/cgal/include
+    /usr/include/eigen3
     ${CUDA_INCLUDE_DIRS}
 )
 
@@ -31,8 +34,13 @@ file(GLOB_RECURSE LOCAL_COMPRESS_FILES
     "src/*.cpp"
 )
 
+find_package(CGAL REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(CUDA REQUIRED)
+
+add_executable(CGALTest tools/CGALTest.cpp)
+set_target_properties(CGALTest PROPERTIES COMPILE_FLAGS -frounding-math)
+target_link_libraries(CGALTest ${CGAL_LIBRARIES} m)
 
 add_executable(MCGAL_Test tools/MCGAL_Test.cpp ${MINI_CGAL_FILES})
 # target_link_libraries(MCGAL_Test /usr/local/lib/libMCGAL.so)

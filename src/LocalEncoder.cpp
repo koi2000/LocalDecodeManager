@@ -37,11 +37,11 @@ void LocalEncoder::encode() {
          * 先mergeboundary再执行具体的encode步骤
          * 解压缩时先decode再decode boundary
          */
+        if (j != 0 && j != 9) {
+            mergeBoundary();
+        }
         for (int i = 0; i < seeds.size(); i++) {
             int result = encodeOp(i);
-        }
-        if (j != 9) {
-            mergeBoundary();
         }
         resetState();
         char path[256];
@@ -244,7 +244,7 @@ void LocalEncoder::dumpToBuffer() {
     dumpFacetSymbolToBuffer();
     int afterDataOffset = dataOffset;
     dumpBoundryMergeMessageToBuffer(prevDataOffset);
-    dumpHalfedgeSymbolToBuffer();
+    // dumpHalfedgeSymbolToBuffer();
 }
 
 void LocalEncoder::dumpBoundaryToBuffer() {
@@ -294,6 +294,8 @@ void LocalEncoder::mergeBoundary() {
             schema.setP(hit->end_vertex->point());
             schema.setGroupId1(hit->face->groupId);
             schema.setGroupId2(hit->opposite->face->groupId);
+            schema.setVid1(hit->opposite->next->end_vertex->id);
+            schema.setVid2(hit->next->end_vertex->id);
             std::set<int> connvid;
             for (MCGAL::Halfedge* hit : hit->end_vertex->halfedges) {
                 connvid.insert(hit->end_vertex->id);
