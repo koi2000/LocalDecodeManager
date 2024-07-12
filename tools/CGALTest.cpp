@@ -1,39 +1,33 @@
-#include <CGAL/Polyhedron_3.h>
+#include <CGAL/IO/OFF.h>
 #include <CGAL/Simple_cartesian.h>
-#include <CGAL/Surface_mesh_simplification/Policies/Edge_collapse/Count_ratio_stop_predicate.h>
-#include <CGAL/Surface_mesh_simplification/Policies/Edge_collapse/Mid_edge_collapse_cost.h>
+#include <CGAL/Surface_mesh.h>
+#include <CGAL/Surface_mesh_simplification/Policies/Edge_collapse/Count_stop_predicate.h>
 #include <CGAL/Surface_mesh_simplification/edge_collapse.h>
-
 #include <fstream>
 
 typedef CGAL::Simple_cartesian<double> Kernel;
-typedef CGAL::Polyhedron_3<Kernel> Polyhedron;
-typedef Polyhedron::HalfedgeDS HalfedgeDS;
-typedef CGAL::Surface_mesh_simplification::Edge_collapse<Polyhedron> ECF;
-typedef CGAL::Surface_mesh_simplification::Count_ratio_stop_predicate<ECF> Stop_predicate;
-typedef CGAL::Surface_mesh_simplification::Mid_edge_collapse_cost<Kernel, HalfedgeDS> Cost_policy;
+typedef Kernel::Point_3 Point;
+typedef CGAL::Surface_mesh<Point> Mesh;
+
+namespace SMS = CGAL::Surface_mesh_simplification;
 
 int main() {
-    Polyhedron mesh;
-
-    // Read mesh from file.
-    if (!CGAL::IO::read_OFF("input.off", mesh)) {
-        std::cerr << "Not a valid OFF file." << std::endl;
+    Mesh mesh;
+    std::ifstream input("input.off");
+    if (!input || !(input >> mesh)) {
+        std::cerr << "Error reading input mesh." << std::endl;
         return 1;
     }
 
-    // Set up the edge collapse function object and policies.
-    ECF ecf(mesh);
-    Cost_policy cost;
-    Stop_predicate sp(0.5);  // Keep 50% of edges.
+    SMS::Count_stop_predicate<Mesh> stop(100);  // 停止条件：仅保留100条边
 
-    // Simplify the mesh.
-    while (ecf.number_of_edges() > sp.min_edges() && ecfcollapse(cost)) {
-        ecf.collapse(ecf.edge_with_min_cost(cost));
+    SMS::edge_collapse(mesh, stop);
+
+    std::ofstream output("output.off");
+    if (!output || !CGAL::IO::write_OFF(output, mesh)) {
+        std::cerr << "Error writing output mesh." << std::endl;
+        return 1;
     }
-
-    // Write the simplified mesh to a file.
-    CGAL::IO::write_OFF("output.off", mesh);
 
     return 0;
 }

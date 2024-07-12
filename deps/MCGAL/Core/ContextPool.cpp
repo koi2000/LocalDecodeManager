@@ -19,7 +19,7 @@ ContextPool::ContextPool() {
         fpool[i].poolId = i;
     }
     vid2PoolId = new int[VID_TO_POOLID];
-    memset(vid2PoolId, 0, sizeof(int) * VID_TO_POOLID);
+    memset(vid2PoolId, 0x7fffffff, sizeof(int) * VID_TO_POOLID);
 }
 
 ContextPool::~ContextPool() {

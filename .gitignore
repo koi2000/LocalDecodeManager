@@ -42,3 +42,4 @@ latex
 *.off
 *.OFF
 /static
+*.json

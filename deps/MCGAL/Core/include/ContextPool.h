@@ -96,6 +96,16 @@ class ContextPool {
         return &vpool[(*vindex)++];
     }
 
+    inline MCGAL::Vertex* tryAllocVertexFromPool(MCGAL::Point p) {
+        // 如果已经创建过这个点，就直接返回
+        if (vid2PoolId[p.id] != -1) {
+            return &vpool[vid2PoolId[p.id]];
+        }
+        vpool[*vindex].setPoint(p);
+        vid2PoolId[p.id] = *vindex;
+        return &vpool[(*vindex)++];
+    }
+
     inline MCGAL::Vertex* allocateVertexFromPool(MCGAL::Point p, int meshId) {
         vpool[*vindex].setPoint(p);
         vpool[*vindex].setMeshId(meshId);
@@ -104,6 +114,16 @@ class ContextPool {
     }
 
     inline MCGAL::Halfedge* allocateHalfedgeFromPool() {
+        return &hpool[(*hindex)++];
+    }
+
+    inline MCGAL::Halfedge* tryAllocateHalfedgeFromPool(MCGAL::Vertex* v1, MCGAL::Vertex* v2) {
+        for (MCGAL::Halfedge* hit : v2->halfedges) {
+            if (hit->end_vertex == v1) {
+                return hit;
+            }
+        }
+        hpool[*hindex].reset(v1, v2);
         return &hpool[(*hindex)++];
     }
 
@@ -124,6 +144,30 @@ class ContextPool {
     inline MCGAL::Facet* allocateFaceFromPool(std::vector<MCGAL::Vertex*> vts) {
         fpool[*findex].reset(vts);
         return &fpool[(*findex)++];
+    }
+
+    inline MCGAL::Facet* tryAllocateFaceFromPool(std::vector<MCGAL::Vertex*> vs) {
+        Halfedge* prev = nullptr;
+        Halfedge* head = nullptr;
+        MCGAL::Facet* fit = allocateFaceFromPool();
+        for (int i = 0; i < vs.size(); i++) {
+            fit->vertices.push_back(vs[i]);
+            Vertex* nextv = vs[(i + 1) % vs.size()];
+            Halfedge* hf = tryAllocateHalfedgeFromPool(vs[i], nextv);
+            fit->halfedges.push_back(hf);
+            // vs[i]->halfedges.insert(hf);
+            hf->face = fit;
+            if (prev != NULL) {
+                prev->next = hf;
+            } else {
+                head = hf;
+            }
+            if (i == vs.size() - 1) {
+                hf->next = head;
+            }
+            prev = hf;
+        }
+        return fit;
     }
 
     inline int preAllocVertex(int size) {

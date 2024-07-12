@@ -24,7 +24,9 @@ void LocalDecoder::decodeOp(int groupId, int lod) {
         std::vector<int> hids = decodeHalfedgeSymbolOp(groupId);
         insertRemovedVertex(fids);
         joinFacet(hids);
-        // decodeBoundary(currentLod, boundarys);
+        if (currentLod != 0) {
+            decodeBoundary(groupId, currentLod, boundarys);
+        }
         resetState();
         currentLod++;
     }
@@ -52,49 +54,62 @@ void LocalDecoder::joinFacet(std::vector<int>& hids) {
     }
 }
 
-void LocalDecoder::decodeBoundary(int lod, std::vector<MCGAL::Halfedge*> boundarys) {
+/**
+ * 每次只解压一半
+ *
+ */
+void LocalDecoder::decodeBoundary(int groupId, int lod, std::vector<MCGAL::Halfedge*> boundarys) {
     buildSchemaIndex(lod);
     std::map<int, EncodeBoundarySchema> lodSchema = boundaryIndexes[lod];
+    EncodeBoundarySchema* schema = nullptr;
     for (int i = 0; i < boundarys.size(); i++) {
+        MCGAL::Vertex* v = nullptr;
         if (lodSchema.count(boundarys[i]->vertex->id)) {
-            EncodeBoundarySchema& schema = lodSchema[boundarys[i]->vertex->id];
-            MCGAL::Vertex* v = boundarys[i]->vertex;
-            // from bitmap build conn
-            char* bitmap = schema.getNeedMoved();
-            std::vector<int> sortedArray;
-            std::map<int, int> order2id;
-            for (MCGAL::Halfedge* h : v->halfedges) {
-                sortedArray.push_back(h->vertex->id);
-            }
-            std::sort(sortedArray.begin(), sortedArray.end());
-            for (int i = 0; i < sortedArray.size(); i++) {
-                order2id[i] = sortedArray[i];
-            }
-            std::vector<MCGAL::Halfedge*> conn;
-            for (int j = 0; j < schema.getNeedMovedSize(); j++) {
-                if (getBit(bitmap, j)) {
-                    int vid = order2id[j];
-                    int poolId = MCGAL::contextPool.vid2PoolId[vid];
-                    conn.push_back(MCGAL::contextPool.getHalfedgeByIndex(poolId));
-                }
-            }
+            v = boundarys[i]->vertex;
+        }
+        if (lodSchema.count(boundarys[i]->end_vertex->id)) {
+            v = boundarys[i]->end_vertex;
+        }
+        if (v == nullptr)
+            continue;
 
-            MCGAL::Halfedge* newh = mesh.vertex_split(boundarys[i]->vertex, schema.getP(), conn, schema.getVid1(), schema.getVid2());
-            newh->face->setGroupId(schema.getGroupId1());
-            newh->opposite->face->setGroupId(schema.getGroupId2());
+        schema = &lodSchema[boundarys[i]->vertex->id];
 
-            // remark boundary
-            for (MCGAL::Halfedge* hit : newh->vertex->halfedges) {
-                if (hit->face->groupId != hit->opposite->face->groupId) {
-                    hit->setBoundary();
-                    hit->opposite->setBoundary();
-                }
+        // from bitmap build conn
+        char* bitmap = schema->getNeedMoved();
+        std::vector<int> sortedArray;
+        std::map<int, int> order2id;
+        for (MCGAL::Halfedge* h : v->halfedges) {
+            sortedArray.push_back(h->vertex->id);
+        }
+        std::sort(sortedArray.begin(), sortedArray.end());
+        for (int i = 0; i < sortedArray.size(); i++) {
+            order2id[i] = sortedArray[i];
+        }
+        std::vector<MCGAL::Halfedge*> conn;
+        for (int j = 0; j < schema->getNeedMovedSize(); j++) {
+            int vid = order2id[j];
+            int poolId = MCGAL::contextPool.vid2PoolId[vid];
+            MCGAL::Halfedge* hit = MCGAL::contextPool.getHalfedgeByIndex(poolId);
+            if (getBit(bitmap, j) && hit->face->groupId == groupId) {
+                conn.push_back(hit);
             }
-            for (MCGAL::Halfedge* hit : newh->end_vertex->halfedges) {
-                if (hit->face->groupId != hit->opposite->face->groupId) {
-                    hit->setBoundary();
-                    hit->opposite->setBoundary();
-                }
+            if (getBit(bitmap, j) && hit->opposite != nullptr && hit->opposite->groupId == groupId) {
+                conn.push_back(hit);
+            }
+        }
+
+        MCGAL::Halfedge* newh = mesh.vertex_split(boundarys[i]->vertex, schema->getP(), conn, schema->getVid1(), schema->getVid2());
+        newh->face->setGroupId(groupId);
+
+        // remark boundary
+        for (MCGAL::Halfedge* hit : newh->vertex->halfedges) {
+            if (hit->opposite == nullptr) {
+                hit->setBoundary();
+            }
+            if (hit->opposite != nullptr && hit->face->groupId != hit->opposite->face->groupId) {
+                hit->setBoundary();
+                hit->opposite->setBoundary();
             }
         }
     }
@@ -103,6 +118,7 @@ void LocalDecoder::decodeBoundary(int lod, std::vector<MCGAL::Halfedge*> boundar
 void LocalDecoder::readBoundary() {
     std::queue<int> gateQueue;
     gateQueue.push(seeds[0]->poolId);
+    std::vector<int> poolIds;
     while (!gateQueue.empty()) {
         int hid = gateQueue.front();
         MCGAL::Halfedge* h = MCGAL::contextPool.getHalfedgeByIndex(hid);
@@ -115,6 +131,7 @@ void LocalDecoder::readBoundary() {
         unsigned sym = readChar(buffer, dataOffset);
         if (sym) {
             h->setBoundary();
+            poolIds.push_back(h->poolId);
         } else {
             h->setNotBoundary();
         }
@@ -125,6 +142,11 @@ void LocalDecoder::readBoundary() {
             }
             hIt = hIt->opposite->next;
         }
+    }
+    // 将所有boundry的opposite设置为null
+    for (int i = 0; i < poolIds.size(); i++) {
+        MCGAL::Halfedge* hit = MCGAL::contextPool.getHalfedgeByIndex(poolIds[i]);
+        hit->opposite = nullptr;
     }
 }
 
@@ -170,11 +192,12 @@ std::vector<int> LocalDecoder::decodeFacetSymbolOp(int groupId, std::vector<MCGA
         f->setProcessedFlag();
         do {
             MCGAL::Halfedge* hOpp = hIt->opposite;
-            if (hOpp->isBoundary()) {
-                poolIdSet.insert(hOpp->poolId);
+
+            if (hIt->isBoundary()) {
+                poolIdSet.insert(hIt->poolId);
             }
             // 对方没有被处理，且该边不是边界
-            if (!hOpp->face->isProcessed() && !hOpp->isBoundary()) {
+            if (hOpp != nullptr && !hOpp->face->isProcessed() && !hOpp->isBoundary()) {
                 gateQueue.push(hOpp->face->poolId);
             }
             hIt = hIt->next;
@@ -225,7 +248,7 @@ std::vector<int> LocalDecoder::decodeHalfedgeSymbolOp(int groupId) {
             }
             MCGAL::Halfedge* hOpp = hIt->opposite;
             // 对方没有被处理，且该边不是边界
-            if (!hOpp->face->isProcessed() && !hOpp->isBoundary()) {
+            if (hOpp != nullptr && !hOpp->face->isProcessed() && !hOpp->isBoundary()) {
                 gateQueue.push(hOpp->face->poolId);
             }
             hIt = hIt->next;

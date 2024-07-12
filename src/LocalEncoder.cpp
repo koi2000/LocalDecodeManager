@@ -40,6 +40,7 @@ void LocalEncoder::encode() {
         if (j != 0 && j != 9) {
             mergeBoundary();
         }
+
         for (int i = 0; i < seeds.size(); i++) {
             int result = encodeOp(i);
         }
@@ -78,7 +79,7 @@ bool LocalEncoder::encodeOp(int groupId) {
             do {
                 hh->vertex->setConquered();
                 MCGAL::Halfedge* hOpp = hh->opposite;
-                if (!hOpp->face->isConquered() && !hOpp->isBoundary() && !h->isBoundary()) {
+                if (!hOpp->face->isConquered() && !hOpp->isBoundary() && !h->isBoundary() && hOpp->face->groupId == groupId) {
                     gateQueue.push(hOpp->poolId);
                 }
             } while ((hh = hh->next) != h);
@@ -139,7 +140,7 @@ void LocalEncoder::encodeFacetSymbolOp(int groupId) {
         do {
             MCGAL::Halfedge* hOpp = hIt->opposite;
             // 对方没有被处理，且该边不是边界
-            if (!hOpp->face->isProcessed() && !hOpp->isBoundary()) {
+            if (!hOpp->face->isProcessed() && !hOpp->isBoundary() && hOpp->face->groupId == groupId) {
                 gateQueue.push(hOpp->face->poolId);
             }
             hIt = hIt->next;
@@ -186,7 +187,7 @@ void LocalEncoder::encodeHalfedgeSymbolOp(int groupId) {
             halfedgeSym.push_back(sym);
             MCGAL::Halfedge* hOpp = hIt->opposite;
             // 对方没有被处理，且该边不是边界
-            if (!hOpp->face->isProcessed() && !hOpp->isBoundary()) {
+            if (!hOpp->face->isProcessed() && !hOpp->isBoundary() && hOpp->face->groupId == groupId) {
                 gateQueue.push(hOpp->face->poolId);
             }
             hIt = hIt->next;
@@ -301,6 +302,7 @@ void LocalEncoder::mergeBoundary() {
                 connvid.insert(hit->end_vertex->id);
             }
             MCGAL::Vertex* newv = mesh.halfedge_collapse(hit);
+            // assert(!willViolateManifold(newv->halfedges));
             int bitmapSize = newv->halfedges.size() / 8 + 1;
             char* bitmap = new char[bitmapSize];
             std::vector<int> sortedArray;
@@ -502,6 +504,10 @@ void LocalEncoder::resetState() {
         } else {
             (*fit)->resetState();
             for (MCGAL::Halfedge* hit : (*fit)->halfedges) {
+                if (hit->face->groupId != hit->opposite->face->groupId) {
+                    hit->setBoundary();
+                    // assert(hit->isBoundary());
+                }
                 hit->resetState();
             }
             fit++;
@@ -687,8 +693,22 @@ bool LocalEncoder::boundaryRemovable(MCGAL::Halfedge* h) {
         }
         poolIds.insert(hit->opposite->face->poolId);
     }
+    std::vector<MCGAL::Halfedge*> hs;
+    poolIds.clear();
+    for (MCGAL::Halfedge* hit : h->vertex->halfedges) {
+        if (poolIds.count(hit->end_vertex->poolId)) {
+            continue;
+        }
+        hs.push_back(hit);
+    }
+    for (MCGAL::Halfedge* hit : h->end_vertex->halfedges) {
+        if (poolIds.count(hit->end_vertex->poolId)) {
+            continue;
+        }
+        hs.push_back(hit);
+    }
 
-    return h->canCollapse() && !h->isRemoved() && h->face->facet_degree() == 3 && h->opposite->face->facet_degree() == 3;
+    return h->canCollapse() && !h->isRemoved() && h->face->facet_degree() == 3 && h->opposite->face->facet_degree() == 3 && !willViolateManifold(hs);
     // for (MCGAL::Halfedge* hit : v->halfedges) {
     //     if (hit->face->facet_degree() != 3) {
     //         return false;

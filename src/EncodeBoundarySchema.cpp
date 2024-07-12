@@ -78,8 +78,8 @@ void EncodeBoundarySchema::setNeedMoved(char* needMoved) {
 void EncodeBoundarySchema::dumpEncodeBoundarySchema(char* buffer, int& dataOffset) {
     writeInt(buffer, dataOffset, vid);
     writePoint(buffer, dataOffset, p);
-    writeInt(buffer, dataOffset, groupId1);
-    writeInt(buffer, dataOffset, groupId2);
+    // writeInt(buffer, dataOffset, groupId1);
+    // writeInt(buffer, dataOffset, groupId2);
     writeInt(buffer, dataOffset, vid1);
     writeInt(buffer, dataOffset, vid2);
     writeInt(buffer, dataOffset, needMovedSize);
@@ -89,8 +89,8 @@ void EncodeBoundarySchema::dumpEncodeBoundarySchema(char* buffer, int& dataOffse
 void EncodeBoundarySchema::loadEncodeBoundarySchema(char* buffer, int& dataOffset) {
     vid = readInt(buffer, dataOffset);
     p = readPoint(buffer, dataOffset);
-    groupId1 = readInt(buffer, dataOffset);
-    groupId2 = readInt(buffer, dataOffset);
+    // groupId1 = readInt(buffer, dataOffset);
+    // groupId2 = readInt(buffer, dataOffset);
     vid1 = readInt(buffer, dataOffset);
     vid2 = readInt(buffer, dataOffset);
     needMovedSize = readInt(buffer, dataOffset);

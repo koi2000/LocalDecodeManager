@@ -12,6 +12,15 @@
 #include <string>
 #include <vector>
 
+/**
+ * decode中要考虑的事情比encode要多
+ * encode如果仅仅考虑边界周围仅有三角行的情况，则有较多的简化
+ * 1. 周围均为三角形，
+ * 2. 理想情况是两边同时进行阉割版的vertex split，不care对面在做什么，只关心自己做什么
+ * 3. opposite可以为空，一个group里爱怎么玩怎么玩，影响不到其他人，duplicate一些点也没关系
+ * ps: 不能duplicate 还是要在内存中只有一份
+ * 存一份有点难搞，一个decode之后会影响周围的形状，暂时先不考虑
+ */
 class LocalDecoder {
   public:
     // 直接读取文件
@@ -54,7 +63,7 @@ class LocalDecoder {
 
     void buildSchemaIndex(int lod);
 
-    void decodeBoundary(int lod, std::vector<MCGAL::Halfedge*> boundarys);
+    void decodeBoundary(int groupId, int lod, std::vector<MCGAL::Halfedge*> boundarys);
 
   private:
     MCGAL::Mesh mesh;

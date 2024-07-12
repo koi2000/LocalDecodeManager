@@ -221,6 +221,8 @@ void Facet::reset(std::vector<Halfedge*>& hs) {
 }
 
 bool Facet::isDegenerate() {
+    if (halfedges.empty())
+        return true;
     MCGAL::Halfedge* hit = halfedges[0];
     MCGAL::Halfedge* h = halfedges[0];
     std::set<int> vpoolIds;
@@ -229,6 +231,11 @@ bool Facet::isDegenerate() {
             return true;
         }
         vpoolIds.insert(vit->poolId);
+    }
+    for (MCGAL::Halfedge* hit : halfedges) {
+        if (hit->opposite == hit->next) {
+            return true;
+        }
     }
 
     std::set<int> poolIds;

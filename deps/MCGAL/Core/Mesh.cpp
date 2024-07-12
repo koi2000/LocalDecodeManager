@@ -3,12 +3,151 @@
 #include "include/Global.h"
 #include "include/Halfedge.h"
 #include "include/Vertex.h"
+#include <array>
 #include <assert.h>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 namespace MCGAL {
+
+// constexpr std::vector<std::vector<int>> colors = {
+//     {0, 0, 0},        // Black
+//     {255, 0, 0},      // Red
+//     {0, 255, 0},      // Green
+//     {0, 0, 255},      // Blue
+//     {255, 255, 0},    // Yellow
+//     {255, 0, 255},    // Magenta
+//     {0, 255, 255},    // Cyan
+//     {128, 128, 128},  // Gray
+//     {255, 165, 0},    // Orange
+//     {128, 0, 128},    // Purple
+//     {64, 224, 208},   // Turquoise
+//     {255, 250, 205},  // Lemon Yellow
+//     {128, 0, 0},      // Maroon
+//     {127, 255, 212},  // Aquamarine
+//     {75, 0, 130},     // Indigo
+//     {255, 160, 122},  // Light Salmon
+//     {32, 178, 170},   // Light Sea Green
+//     {135, 206, 250},  // Light Sky Blue
+//     {119, 136, 153},  // Light Slate Gray
+//     {176, 196, 222},  // Light Steel Blue
+//     {255, 255, 224},  // Light Yellow
+//     {250, 128, 114},  // Salmon
+//     {106, 90, 205},   // Slate Blue
+//     {112, 128, 144},  // Slate Gray
+//     {0, 0, 128},      // Navy
+//     {189, 183, 107},  // Dark Khaki
+//     {153, 50, 204},   // Dark Orchid
+//     {205, 133, 63},   // Peru
+//     {128, 128, 0},    // Olive
+//     {160, 82, 45},    // Sienna
+//     {102, 205, 170},  // Medium Aquamarine
+//     {50, 205, 50},    // Lime Green
+//     {70, 130, 180},   // Steel Blue
+//     {210, 105, 30},   // Chocolate
+//     {154, 205, 50},   // Yellow Green
+//     {219, 112, 147},  // Pale Violet Red
+//     {173, 255, 47},   // Green Yellow
+//     {240, 255, 255},  // Azure
+//     {255, 127, 80},   // Coral
+//     {238, 130, 238},  // Violet
+//     {75, 0, 130},     // Indigo
+//     {255, 105, 180},  // Hot Pink
+//     {0, 250, 154},    // Medium Spring Green
+//     {0, 191, 255},    // Deep Sky Blue
+//     {255, 99, 71},    // Tomato
+//     {245, 222, 179},  // Wheat
+//     {255, 228, 196},  // Bisque
+//     {255, 215, 0},    // Gold
+//     {139, 69, 19},    // Saddle Brown
+//     {255, 228, 181},  // Moccasin
+//     {152, 251, 152},  // Pale Green
+//     {238, 232, 170},  // Pale Goldenrod
+//     {255, 140, 0},    // Dark Orange
+//     {255, 140, 105},  // Light Salmon
+//     {0, 128, 128},    // Teal
+//     {255, 228, 225},  // Blanched Almond
+//     {192, 192, 192},  // Silver
+//     {0, 0, 139},      // Dark Blue
+//     {173, 216, 230},  // Light Blue
+//     {0, 255, 255},    // Aqua
+//     {139, 0, 139},    // Dark Magenta
+//     {255, 250, 250},  // Snow
+//     {245, 245, 220},  // Beige
+//     {0, 255, 127},    // Spring Green
+//     {255, 105, 180},  // Hot Pink
+//     {255, 255, 255}   // White
+// };
+
+constexpr std::array<std::array<int, 3>, 68> colors = {{
+    {0, 0, 0},        // Black
+    {255, 0, 0},      // Red
+    {0, 255, 0},      // Green
+    {0, 0, 255},      // Blue
+    {255, 255, 0},    // Yellow
+    {255, 0, 255},    // Magenta
+    {0, 255, 255},    // Cyan
+    {128, 128, 128},  // Gray
+    {255, 165, 0},    // Orange
+    {128, 0, 128},    // Purple
+    {64, 224, 208},   // Turquoise
+    {255, 250, 205},  // Lemon Yellow
+    {128, 0, 0},      // Maroon
+    {127, 255, 212},  // Aquamarine
+    {75, 0, 130},     // Indigo
+    {255, 160, 122},  // Light Salmon
+    {32, 178, 170},   // Light Sea Green
+    {135, 206, 250},  // Light Sky Blue
+    {119, 136, 153},  // Light Slate Gray
+    {176, 196, 222},  // Light Steel Blue
+    {255, 255, 224},  // Light Yellow
+    {250, 128, 114},  // Salmon
+    {106, 90, 205},   // Slate Blue
+    {112, 128, 144},  // Slate Gray
+    {0, 0, 128},      // Navy
+    {189, 183, 107},  // Dark Khaki
+    {153, 50, 204},   // Dark Orchid
+    {205, 133, 63},   // Peru
+    {128, 128, 0},    // Olive
+    {160, 82, 45},    // Sienna
+    {102, 205, 170},  // Medium Aquamarine
+    {50, 205, 50},    // Lime Green
+    {70, 130, 180},   // Steel Blue
+    {210, 105, 30},   // Chocolate
+    {154, 205, 50},   // Yellow Green
+    {219, 112, 147},  // Pale Violet Red
+    {173, 255, 47},   // Green Yellow
+    {240, 255, 255},  // Azure
+    {255, 127, 80},   // Coral
+    {238, 130, 238},  // Violet
+    {75, 0, 130},     // Indigo
+    {255, 105, 180},  // Hot Pink
+    {0, 250, 154},    // Medium Spring Green
+    {0, 191, 255},    // Deep Sky Blue
+    {255, 99, 71},    // Tomato
+    {245, 222, 179},  // Wheat
+    {255, 228, 196},  // Bisque
+    {255, 215, 0},    // Gold
+    {139, 69, 19},    // Saddle Brown
+    {255, 228, 181},  // Moccasin
+    {152, 251, 152},  // Pale Green
+    {238, 232, 170},  // Pale Goldenrod
+    {255, 140, 0},    // Dark Orange
+    {255, 140, 105},  // Light Salmon
+    {0, 128, 128},    // Teal
+    {255, 228, 225},  // Blanched Almond
+    {192, 192, 192},  // Silver
+    {0, 0, 139},      // Dark Blue
+    {173, 216, 230},  // Light Blue
+    {0, 255, 255},    // Aqua
+    {139, 0, 139},    // Dark Magenta
+    {255, 250, 250},  // Snow
+    {245, 245, 220},  // Beige
+    {0, 255, 127},    // Spring Green
+    {255, 105, 180},  // Hot Pink
+    {255, 255, 255}   // White
+}};
 
 Mesh::~Mesh() {
     // for (Facet* f : faces) {
@@ -134,7 +273,7 @@ MCGAL::Vertex* Mesh::halfedge_collapse(MCGAL::Halfedge* h) {
             printf("error");
         }
         hit->face->reset(hit);
-        assert(!hit->face->isDegenerate());
+        assert(!hit->face->isDegenerate() && !hit->opposite->face->isDegenerate());
         if (hit->face->isDegenerate()) {
             printf("error");
             hit->face->isRemoved();
@@ -148,65 +287,91 @@ MCGAL::Vertex* Mesh::halfedge_collapse(MCGAL::Halfedge* h) {
  * @param v 需要被split的点
  * @param p 需要被新插入的边
  * @param conn 需要被连接到新点的边
+ * @param vid1 vid2
  */
 MCGAL::Halfedge* Mesh::vertex_split(MCGAL::Vertex* v, MCGAL::Point p, std::vector<Halfedge*> conn, int vid1, int vid2) {
     // TODO: 完善该方法
-    MCGAL::Vertex* vnew = MCGAL::contextPool.allocateVertexFromPool(p);
-    MCGAL::Halfedge* newh = MCGAL::contextPool.allocateHalfedgeFromPool(v, vnew);
-    MCGAL::Halfedge* onewh = MCGAL::contextPool.allocateHalfedgeFromPool(vnew, v);
+    MCGAL::Vertex* vnew = MCGAL::contextPool.tryAllocVertexFromPool(p);
+    // MCGAL::Halfedge* newh = MCGAL::contextPool.allocateHalfedgeFromPool(v, vnew);
     MCGAL::Halfedge* split1 = nullptr;
     MCGAL::Halfedge* split2 = nullptr;
     std::set<int> poolIds;
-    // 将本该属于vnew的边还回去
+    // 某个点，谁两边的边 groupId不一样谁就被分割
+    // conn里只处理groupId属于该半边的
+    /**
+     * 四种case，每种都要单独处理
+     * 最好是分的一人一边，然后直接创建新的face
+     */
+    std::vector<MCGAL::Vertex*> vts;
     for (MCGAL::Halfedge* hit : conn) {
-        if (hit->end_vertex->id == vid1) {
-            split1 = hit;
-            continue;
-        } else if (hit->end_vertex->id == vid2) {
-            split2 = hit;
-            continue;
+        // 分割边被分割后仍属于同一个group
+        // 需要维护opposite
+        if (hit->end_vertex->id == vid1 && hit->opposite != nullptr) {
+            hit->vertex->eraseHalfedgeByPointer(hit);
+            hit->vertex = vnew;
+            vnew->halfedges.push_back(hit);
+            poolIds.insert(hit->end_vertex->poolId);
+            vts.push_back(hit->end_vertex);
+            vts.push_back(vnew);
+            vts.push_back(v);
         }
-        poolIds.insert(hit->end_vertex->poolId);
-        hit->vertex = vnew;
-        hit->opposite->end_vertex = vnew;
+        // 边界情况
+        if (hit->end_vertex->id == vid1 && hit->opposite == nullptr) {
+            hit->vertex = vnew;
+            poolIds.insert(hit->end_vertex->poolId);
+        }
+        // 该group只有end_vertex指向自己的边
+        if (hit->vertex->id == vid1) {
+            vnew->halfedges.push_back(hit);
+            vts.push_back(vnew);
+            vts.push_back(hit->vertex);
+            vts.push_back(v);
+        }
+        if (hit->vertex == v) {
+            hit->vertex = vnew;
+        }
+        if (hit->opposite != nullptr && hit->opposite->face->groupId == hit->face->groupId) {
+            hit->opposite->end_vertex = vnew;
+        }
     }
 
     // 删除v中不属于他的边
     for (auto it = v->halfedges.begin(); it != v->halfedges.end();) {
         if (poolIds.count((*it)->poolId)) {
+            vnew->halfedges.push_back(*it);
             it = v->halfedges.erase(it);
         } else {
             it++;
         }
     }
-    MCGAL::Halfedge* hit1 = MCGAL::contextPool.allocateHalfedgeFromPool(split1->end_vertex, vnew);
-    MCGAL::Halfedge* ohit1 = MCGAL::contextPool.allocateHalfedgeFromPool(vnew, split1->end_vertex);
-    MCGAL::Halfedge* hit2 = MCGAL::contextPool.allocateHalfedgeFromPool(split2->end_vertex, vnew);
-    MCGAL::Halfedge* ohit2 = MCGAL::contextPool.allocateHalfedgeFromPool(vnew, split2->end_vertex);
-    MCGAL::Halfedge* split1_prev = find_prev(split1);
-    hit1->next = split1->next;
-    split1_prev->next = hit1;
-    ohit1->next = onewh;
-    onewh->next = split1;
-    split1->next = ohit1;
+    // MCGAL::Halfedge* hit1 = MCGAL::contextPool.allocateHalfedgeFromPool(split1->end_vertex, vnew);
+    // MCGAL::Halfedge* ohit1 = MCGAL::contextPool.allocateHalfedgeFromPool(vnew, split1->end_vertex);
+    // MCGAL::Halfedge* hit2 = MCGAL::contextPool.allocateHalfedgeFromPool(split2->end_vertex, vnew);
+    // MCGAL::Halfedge* ohit2 = MCGAL::contextPool.allocateHalfedgeFromPool(vnew, split2->end_vertex);
+    // MCGAL::Halfedge* split1_prev = find_prev(split1);
+    // hit1->next = split1->next;
+    // split1_prev->next = hit1;
+    // ohit1->next = onewh;
+    // onewh->next = split1;
+    // split1->next = ohit1;
 
-    MCGAL::Halfedge* split2_prev = find_prev(split2);
-    hit2->next = split2->next;
-    split2_prev->next = hit2;
-    ohit2->next = onewh;
-    onewh->next = split2;
-    split2->next = ohit2;
-    MCGAL::Facet* f1 = MCGAL::contextPool.allocateFaceFromPool();
-    f1->reset(split1);
+    // MCGAL::Halfedge* split2_prev = find_prev(split2);
+    // hit2->next = split2->next;
+    // split2_prev->next = hit2;
+    // ohit2->next = onewh;
+    // onewh->next = split2;
+    // split2->next = ohit2;
+    // MCGAL::Facet* f1 = MCGAL::contextPool.allocateFaceFromPool();
+    // f1->reset(split1);
 
-    MCGAL::Facet* f2 = MCGAL::contextPool.allocateFaceFromPool();
-    f2->reset(split2);
-    for (MCGAL::Halfedge* hit : v->halfedges) {
-        hit->face->reset(hit);
-    }
-    for (MCGAL::Halfedge* hit : vnew->halfedges) {
-        hit->face->reset(hit);
-    }
+    // MCGAL::Facet* f2 = MCGAL::contextPool.allocateFaceFromPool();
+    // f2->reset(split2);
+    // for (MCGAL::Halfedge* hit : v->halfedges) {
+    //     hit->face->reset(hit);
+    // }
+    // for (MCGAL::Halfedge* hit : vnew->halfedges) {
+    //     hit->face->reset(hit);
+    // }
 }
 
 Halfedge* Mesh::split_facet(Halfedge* h, Halfedge* g) {
@@ -471,74 +636,7 @@ void Mesh::dumpto(std::string path) {
         offFile << vertex->x() << " " << vertex->y() << " " << vertex->z() << "\n";
         vertex->setVid(id++);
     }
-    std::vector<std::vector<int>> colors = {
-        {0, 0, 0},        // Black
-        {255, 0, 0},      // Red
-        {0, 255, 0},      // Green
-        {0, 0, 255},      // Blue
-        {255, 255, 0},    // Yellow
-        {255, 0, 255},    // Magenta
-        {0, 255, 255},    // Cyan
-        {128, 128, 128},  // Gray
-        {255, 165, 0},    // Orange
-        {128, 0, 128},    // Purple
-        {64, 224, 208},   // Turquoise
-        {255, 250, 205},  // Lemon Yellow
-        {128, 0, 0},      // Maroon
-        {127, 255, 212},  // Aquamarine
-        {75, 0, 130},     // Indigo
-        {255, 160, 122},  // Light Salmon
-        {32, 178, 170},   // Light Sea Green
-        {135, 206, 250},  // Light Sky Blue
-        {119, 136, 153},  // Light Slate Gray
-        {176, 196, 222},  // Light Steel Blue
-        {255, 255, 224},  // Light Yellow
-        {250, 128, 114},  // Salmon
-        {106, 90, 205},   // Slate Blue
-        {112, 128, 144},  // Slate Gray
-        {0, 0, 128},      // Navy
-        {189, 183, 107},  // Dark Khaki
-        {153, 50, 204},   // Dark Orchid
-        {205, 133, 63},   // Peru
-        {128, 128, 0},    // Olive
-        {160, 82, 45},    // Sienna
-        {102, 205, 170},  // Medium Aquamarine
-        {50, 205, 50},    // Lime Green
-        {70, 130, 180},   // Steel Blue
-        {210, 105, 30},   // Chocolate
-        {154, 205, 50},   // Yellow Green
-        {219, 112, 147},  // Pale Violet Red
-        {173, 255, 47},   // Green Yellow
-        {240, 255, 255},  // Azure
-        {255, 127, 80},   // Coral
-        {238, 130, 238},  // Violet
-        {75, 0, 130},     // Indigo
-        {255, 105, 180},  // Hot Pink
-        {0, 250, 154},    // Medium Spring Green
-        {0, 191, 255},    // Deep Sky Blue
-        {255, 99, 71},    // Tomato
-        {245, 222, 179},  // Wheat
-        {255, 228, 196},  // Bisque
-        {255, 215, 0},    // Gold
-        {139, 69, 19},    // Saddle Brown
-        {255, 228, 181},  // Moccasin
-        {152, 251, 152},  // Pale Green
-        {238, 232, 170},  // Pale Goldenrod
-        {255, 140, 0},    // Dark Orange
-        {255, 140, 105},  // Light Salmon
-        {0, 128, 128},    // Teal
-        {255, 228, 225},  // Blanched Almond
-        {192, 192, 192},  // Silver
-        {0, 0, 139},      // Dark Blue
-        {173, 216, 230},  // Light Blue
-        {0, 255, 255},    // Aqua
-        {139, 0, 139},    // Dark Magenta
-        {255, 250, 250},  // Snow
-        {245, 245, 220},  // Beige
-        {0, 255, 127},    // Spring Green
-        {255, 105, 180},  // Hot Pink
-        {255, 255, 255}   // White
-    };
+
     for (Facet* face : this->faces) {
         if (face->isRemoved())
             continue;
