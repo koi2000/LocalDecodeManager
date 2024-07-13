@@ -549,7 +549,7 @@ bool Mesh::loadOFF(std::string path) {
     for (int i = 0; i < nb_vertices; ++i) {
         float x, y, z;
         file >> x >> y >> z;
-        Vertex* vt = MCGAL::contextPool.allocateVertexFromPool(x, y, z, i);
+        Vertex* vt = MCGAL::contextPool.allocateVertexFromPool(x, y, z);
         // Vertex* vt = new Vertex(x, y, z);
         this->vertices.push_back(vt);
     }

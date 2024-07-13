@@ -6,6 +6,7 @@ ContextPool::ContextPool() {
     vindex = new int(0);
     hindex = new int(0);
     findex = new int(0);
+    vid = new int(0);
     vpool = new MCGAL::Vertex[VERTEX_POOL_SIZE];
     for (int i = 0; i < VERTEX_POOL_SIZE; i++) {
         vpool[i].poolId = i;
@@ -45,6 +46,7 @@ void ContextPool::mallocOnCpu() {
     vindex = new int(0);
     hindex = new int(0);
     findex = new int(0);
+    vid = new int(0);
     vpool = new MCGAL::Vertex[VERTEX_POOL_SIZE];
     for (int i = 0; i < VERTEX_POOL_SIZE; i++) {
         vpool[i].poolId = i;

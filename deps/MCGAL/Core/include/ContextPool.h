@@ -18,6 +18,7 @@ class ContextPool {
     int* vindex;
     int* hindex;
     int* findex;
+    int* vid;
     ContextPool();
 
   public:
@@ -69,11 +70,24 @@ class ContextPool {
     }
 
     inline MCGAL::Vertex* allocateVertexFromPool() {
-        return &vpool[(*vindex)++];
+        MCGAL::Vertex* v = &vpool[*vindex];
+        v->id = *vid;
+        vid2PoolId[(*vid)++] = (*vindex)++;
+        return v;
+    }
+
+    inline MCGAL::Vertex* dupVertexFromPool(MCGAL::Vertex* v) {
+        MCGAL::Vertex* vit = &vpool[*vindex];
+        vit->setPoint(v->point());
+        vit->id = *vid;
+        vid2PoolId[(*vid)++] = (*vindex)++;
+        return vit;
     }
 
     inline MCGAL::Vertex* allocateVertexFromPool(float x, float y, float z) {
-        vpool[*vindex].setPoint({x, y, z});
+        vpool[*vindex].setPoint({x, y, z, *vid});
+        vid2PoolId[*vid] = *vindex;
+        (*vid)++;
         return &vpool[(*vindex)++];
     }
 

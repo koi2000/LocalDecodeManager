@@ -45,6 +45,8 @@ find_package(CUDA REQUIRED)
 add_executable(MCGAL_Test tools/MCGAL_Test.cpp ${MINI_CGAL_FILES})
 # target_link_libraries(MCGAL_Test /usr/local/lib/libMCGAL.so)
 
+add_executable(LocalSplitterTest tools/LocalSplitterTest.cpp ${LOCAL_COMPRESS_FILES} ${MINI_CGAL_FILES})
+
 add_executable(LocalEncoderTest tools/LocalEncoderTest.cpp ${LOCAL_COMPRESS_FILES} ${MINI_CGAL_FILES})
 # target_link_libraries(LocalEncoderTest /usr/local/lib/libMCGAL.so)
 
