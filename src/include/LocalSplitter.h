@@ -5,6 +5,7 @@
 #include "biops.h"
 #include "core.h"
 #include "syncbitops.h"
+#include <Graph.h>
 #include <cstring>
 #include <queue>
 #include <random>
@@ -14,21 +15,36 @@
 
 #define RANDOM_SEED 1035
 
+/**
+ * 内存中需要构建一个图结构，点是subMesh，边指的是两个subMesh之间有邻接关系
+ */
 class LocalSplitter {
   public:
+    LocalSplitter() = default;
+
     LocalSplitter(std::string filename);
 
-    void split();
+    LocalSplitter(MCGAL::Mesh* mesh);
+
+    void loadMesh(MCGAL::Mesh* mesh);
+
+    void split(std::vector<MCGAL::Mesh>& res);
 
     void dumpSubMesh(std::string path, int groupId);
+
+    std::vector<MCGAL::Halfedge*>& exportSeeds();
+
+    Graph exportGraph();
 
   private:
     void markBoundry();
 
   private:
-    MCGAL::Mesh mesh;
+    MCGAL::Mesh* mesh;
+    std::vector<int> unRemovedPoint;
     std::vector<MCGAL::Mesh> subMeshes;
     std::vector<MCGAL::Halfedge*> seeds;
+    Graph g;
 };
 
 #endif

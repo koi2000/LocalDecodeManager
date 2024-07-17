@@ -3,24 +3,44 @@
 #include <map>
 
 LocalSplitter::LocalSplitter(std::string filename) {
-    mesh.loadOFF(filename);
+    mesh->loadOFF(filename);
     markBoundry();
+}
+
+LocalSplitter::LocalSplitter(MCGAL::Mesh* mesh_) {
+    this->mesh = mesh_;
+    markBoundry();
+}
+
+void LocalSplitter::loadMesh(MCGAL::Mesh* mesh_) {
+    this->mesh = mesh_;
+    markBoundry();
+}
+
+std::vector<MCGAL::Halfedge*>& LocalSplitter::exportSeeds() {
+    return seeds;
+}
+
+Graph LocalSplitter::exportGraph() {
+    return std::move(g);
 }
 
 /**
  * 使用copy_if直接拷贝过去
  * 对point需要进行dup
  */
-void LocalSplitter::split() {
+void LocalSplitter::split(std::vector<MCGAL::Mesh>& res) {
     for (int i = 0; i < subMeshes.size(); i++) {
-        // subMeshes[i].faces.resize(mesh.size_of_facets());
-        std::copy_if(mesh.faces.begin(), mesh.faces.end(), std::back_inserter(subMeshes[i].faces), [&i](const MCGAL::Facet* f) { return f->groupId == i; });
+        // subMeshes[i].faces.resize(mesh->size_of_facets());
+        std::copy_if(mesh->faces.begin(), mesh->faces.end(), std::back_inserter(subMeshes[i].faces), [&i](const MCGAL::Facet* f) { return f->groupId == i; });
     }
     for (size_t i = 0; i < subMeshes.size(); i++) {
         std::map<int, int> id2id;
         for (MCGAL::Facet* fit : subMeshes[i].faces) {
             for (MCGAL::Halfedge* hit : fit->halfedges) {
                 if (hit->isBoundary()) {
+                    // 加入图中
+                    g.addEdge(hit->face->groupId, hit->opposite->face->groupId);
                     MCGAL::Vertex* dup1 = nullptr;
                     MCGAL::Vertex* dup2 = nullptr;
                     if (id2id.count(hit->vertex->poolId)) {
@@ -60,6 +80,7 @@ void LocalSplitter::split() {
             }
         }
     }
+    res.assign(std::make_move_iterator(subMeshes.begin()), std::make_move_iterator(subMeshes.end()));
 }
 
 void LocalSplitter::dumpSubMesh(std::string path, int groupId) {
@@ -72,7 +93,7 @@ void LocalSplitter::dumpSubMesh(std::string path, int groupId) {
  * mesh里只有vretex和facet，需要对vertex进行duplicate
  */
 void LocalSplitter::markBoundry() {
-    int fsize = mesh.size_of_facets();
+    int fsize = mesh->size_of_facets();
     int sampleNumber = fsize / 3000;
     std::vector<int> stBfsId(fsize);
     std::vector<int> stVertex;
@@ -86,11 +107,11 @@ void LocalSplitter::markBoundry() {
     stBfsId.resize(sampleNumber);
     std::queue<int> gateQueue;
     for (int i = 0; i < sampleNumber; i++) {
-        seeds.push_back(mesh.faces[stBfsId[i]]->halfedges[0]);
-        mesh.faces[stBfsId[i]]->halfedges[0]->face->groupId = i;
-        gateQueue.push(mesh.faces[stBfsId[i]]->poolId);
-        stVertex.push_back(mesh.faces[stBfsId[i]]->halfedges[0]->vertex->id);
-        stVertex.push_back(mesh.faces[stBfsId[i]]->halfedges[0]->end_vertex->id);
+        seeds.push_back(mesh->faces[stBfsId[i]]->halfedges[0]);
+        mesh->faces[stBfsId[i]]->halfedges[0]->face->groupId = i;
+        gateQueue.push(mesh->faces[stBfsId[i]]->poolId);
+        stVertex.push_back(mesh->faces[stBfsId[i]]->halfedges[0]->vertex->id);
+        stVertex.push_back(mesh->faces[stBfsId[i]]->halfedges[0]->end_vertex->id);
     }
 
     while (!gateQueue.empty()) {
