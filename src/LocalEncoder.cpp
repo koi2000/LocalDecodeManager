@@ -301,7 +301,7 @@ void LocalEncoder::mergeBoundary() {
             for (MCGAL::Halfedge* hit : hit->end_vertex->halfedges) {
                 connvid.insert(hit->end_vertex->id);
             }
-            MCGAL::Vertex* newv = mesh.halfedge_collapse(hit);
+            MCGAL::Vertex* newv = mesh.edge_collapse(hit);
             // assert(!willViolateManifold(newv->halfedges));
             int bitmapSize = newv->halfedges.size() / 8 + 1;
             char* bitmap = new char[bitmapSize];

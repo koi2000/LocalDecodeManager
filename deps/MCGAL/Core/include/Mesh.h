@@ -77,6 +77,8 @@ class Mesh {
         return halfedges.size();
     }
 
+    MCGAL::Vertex* edge_collapse(MCGAL::Halfedge* h);
+
     MCGAL::Vertex* halfedge_collapse(MCGAL::Halfedge* h);
 
     // MCGAL::Halfedge* vertex_split(MCGAL::Vertex* v);

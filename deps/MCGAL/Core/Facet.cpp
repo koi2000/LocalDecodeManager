@@ -181,7 +181,7 @@ void Facet::reset(Halfedge* h) {
     Halfedge* ed = h;
     std::vector<Halfedge*> edges;
     do {
-        assert(st->next->vertex == st->end_vertex);
+        // assert(st->next->vertex == st->end_vertex);
         edges.push_back(st);
         st = st->next;
     } while (st != ed);

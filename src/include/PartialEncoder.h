@@ -11,11 +11,9 @@ class PartialEncoder {
 
     void encode(int groupId, int round);
 
-    void encodeInsideOp(int groupId);
+    std::set<int> encodeInsideOp(int groupId);
 
-    // void encodeInsideOp(int groupId);
-
-    // void encodeBoundaryOp();
+    void encodeBoundaryOp(int groupId, std::set<int>& boundaryIds);
 
   private:
     void resetState(int groupId);
@@ -42,7 +40,7 @@ class PartialEncoder {
 
     // void encodeLocalBoundary(int groupId, std::vector<int>& boundarys);
 
-    // bool boundaryRemovable(MCGAL::Halfedge* h);
+    bool isBoundaryRemovable(MCGAL::Halfedge* h);
     // // 为网格设置边界
     // void markBoundry();
 

@@ -163,8 +163,8 @@ Mesh::~Mesh() {
     // delete[] vpool;
     // delete[] hpool;
     // delete[] fpool;
-    vertices.clear();
-    faces.clear();
+    // vertices.clear();
+    // faces.clear();
     // halfedges.clear();
 }
 
@@ -207,10 +207,41 @@ void Mesh::eraseVertexByPointer(Vertex* vertex) {
     }
 }
 
+MCGAL::Vertex* Mesh::halfedge_collapse(MCGAL::Halfedge* h) {
+    MCGAL::Vertex* v1 = h->vertex;
+    MCGAL::Vertex* v2 = h->end_vertex;
+    v1->setPoint((v1->x() + v2->x()) / 2, (v1->y() + v2->y()) / 2, (v1->z() + v2->z()) / 2);
+    MCGAL::Halfedge* ohprev = find_prev(h);
+    // 修改opposite
+    h->next->opposite->opposite = ohprev->opposite;
+    ohprev->opposite->opposite = h->next->opposite;
+    // 先处理逻辑关系
+    for (MCGAL::Halfedge* hit : h->face->halfedges) {
+        hit->setRemoved();
+        hit->vertex->eraseHalfedgeByPointer(hit);
+    }
+    v2->setRemoved();
+    h->face->setRemoved();
+    // 将v2中所有边移动至v1
+    for (int i = 0; i < v2->halfedges.size(); i++) {
+        MCGAL::Halfedge* hit = v2->halfedges[i];
+        if (hit->poolId == h->poolId || hit->opposite->poolId == h->poolId) {
+            continue;
+        }
+        if (hit->opposite->face->groupId == h->groupId) {
+            hit->opposite->end_vertex = v1;
+        }
+
+        hit->vertex = v1;
+        v1->halfedges.push_back(hit);
+    }
+    return v1;
+}
+
 /**
  * 不完全版本，可能会导致退化面
  */
-MCGAL::Vertex* Mesh::halfedge_collapse(MCGAL::Halfedge* h) {
+MCGAL::Vertex* Mesh::edge_collapse(MCGAL::Halfedge* h) {
     h->setRemoved();
     h->opposite->setRemoved();
     // h->opposite->face->setRemoved();

@@ -6,7 +6,7 @@
 int main() {
     MCGAL::Mesh m;
     m.loadOFF("/home/koi/mastercode/LocalDecodeManager/static/untitled.off");
-    m.halfedge_collapse(m.faces[0]->halfedges[0]);
+    m.edge_collapse(m.faces[0]->halfedges[0]);
     m.dumpto("/home/koi/mastercode/LocalDecodeManager/static/collapse.off");
     return 0;
 }

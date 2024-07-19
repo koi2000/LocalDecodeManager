@@ -28,7 +28,7 @@ class LocalSplitter {
 
     void loadMesh(MCGAL::Mesh* mesh);
 
-    void split(std::vector<MCGAL::Mesh>& res);
+    void split();
 
     void dumpSubMesh(std::string path, int groupId);
 
@@ -36,11 +36,13 @@ class LocalSplitter {
 
     Graph exportGraph();
 
+    std::vector<MCGAL::Mesh>& exportSubMeshes();
+
   private:
     void markBoundry();
 
   private:
-    MCGAL::Mesh* mesh;
+    MCGAL::Mesh* mesh = nullptr;
     std::vector<int> unRemovedPoint;
     std::vector<MCGAL::Mesh> subMeshes;
     std::vector<MCGAL::Halfedge*> seeds;

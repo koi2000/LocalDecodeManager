@@ -3,6 +3,7 @@
 #include <map>
 
 LocalSplitter::LocalSplitter(std::string filename) {
+    mesh = new MCGAL::Mesh();
     mesh->loadOFF(filename);
     markBoundry();
 }
@@ -25,17 +26,23 @@ Graph LocalSplitter::exportGraph() {
     return std::move(g);
 }
 
+std::vector<MCGAL::Mesh>& LocalSplitter::exportSubMeshes() {
+    return subMeshes;
+    // res.assign(std::make_move_iterator(subMeshes.begin()), std::make_move_iterator(subMeshes.end()));
+}
+
 /**
  * 使用copy_if直接拷贝过去
  * 对point需要进行dup
  */
-void LocalSplitter::split(std::vector<MCGAL::Mesh>& res) {
+void LocalSplitter::split() {
     for (int i = 0; i < subMeshes.size(); i++) {
         // subMeshes[i].faces.resize(mesh->size_of_facets());
         std::copy_if(mesh->faces.begin(), mesh->faces.end(), std::back_inserter(subMeshes[i].faces), [&i](const MCGAL::Facet* f) { return f->groupId == i; });
     }
     for (size_t i = 0; i < subMeshes.size(); i++) {
         std::map<int, int> id2id;
+        std::set<int> uniqueIds;
         for (MCGAL::Facet* fit : subMeshes[i].faces) {
             for (MCGAL::Halfedge* hit : fit->halfedges) {
                 if (hit->isBoundary()) {
@@ -48,39 +55,47 @@ void LocalSplitter::split(std::vector<MCGAL::Mesh>& res) {
                     } else {
                         dup1 = MCGAL::contextPool.dupVertexFromPool(hit->vertex);
                         id2id[hit->vertex->poolId] = dup1->poolId;
-                        for (int j = 0; j < hit->vertex->halfedges.size(); j++) {
-                            MCGAL::Halfedge* vhit = hit->vertex->halfedges[j];
-                            if (vhit->face->groupId == i) {
-                                dup1->halfedges.push_back(vhit);
-                            }
-                        }
+                        // for (int j = 0; j < hit->vertex->halfedges.size(); j++) {
+                        //     MCGAL::Halfedge* vhit = hit->vertex->halfedges[j];
+                        //     if (vhit->face->groupId == i) {
+                        //         dup1->halfedges.push_back(vhit);
+                        //     }
+                        // }
+                        uniqueIds.insert(dup1->poolId);
                     }
-                    subMeshes[i].vertices.push_back(dup1);
 
                     if (id2id.count(hit->end_vertex->poolId)) {
                         dup2 = MCGAL::contextPool.getVertexByIndex(id2id[hit->end_vertex->poolId]);
                     } else {
                         dup2 = MCGAL::contextPool.dupVertexFromPool(hit->end_vertex);
                         id2id[hit->end_vertex->poolId] = dup2->poolId;
+                        uniqueIds.insert(dup2->poolId);
                     }
 
                 } else {
-                    subMeshes[i].vertices.push_back(hit->vertex);
+                    uniqueIds.insert(hit->vertex->poolId);
                 }
             }
         }
+        // for (int id : uniqueIds) {
+        //     subMeshes[i].vertices.push_back(MCGAL::contextPool.getVertexByIndex(id));
+        // }
+        std::transform(uniqueIds.begin(), uniqueIds.end(), std::back_inserter(subMeshes[i].vertices), [&](int id) { return MCGAL::contextPool.getVertexByIndex(id); });
         for (MCGAL::Facet* fit : subMeshes[i].faces) {
             for (MCGAL::Halfedge* hit : fit->halfedges) {
                 if (id2id.count(hit->vertex->poolId)) {
                     hit->vertex = MCGAL::contextPool.getVertexByIndex(id2id[hit->vertex->poolId]);
+                    hit->vertex->halfedges.push_back(hit);
                 }
                 if (id2id.count(hit->end_vertex->poolId)) {
                     hit->end_vertex = MCGAL::contextPool.getVertexByIndex(id2id[hit->end_vertex->poolId]);
+                    if (hit->opposite->face->groupId == i) {
+                        hit->end_vertex->halfedges.push_back(hit->opposite);
+                    }
                 }
             }
         }
     }
-    res.assign(std::make_move_iterator(subMeshes.begin()), std::make_move_iterator(subMeshes.end()));
 }
 
 void LocalSplitter::dumpSubMesh(std::string path, int groupId) {

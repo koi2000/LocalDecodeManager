@@ -3,7 +3,8 @@
 PartialEncoder::PartialEncoder(std::string path) {
     mesh.loadOFF(path);
     splitter.loadMesh(&mesh);
-    splitter.split(subMeshes);
+    splitter.split();
+    subMeshes = std::move(splitter.exportSubMeshes());
     splitter.exportGraph();
     seeds = splitter.exportSeeds();
 }
@@ -11,7 +12,8 @@ PartialEncoder::PartialEncoder(std::string path) {
 void PartialEncoder::encode(int groupId, int round) {
     int cur_round = 0;
     while (cur_round < round) {
-        encodeInsideOp(groupId);
+        std::set<int> st = encodeInsideOp(groupId);
+        encodeBoundaryOp(groupId, st);
         std::string path = "./submesh1/group" + std::to_string(cur_round) + ".off";
         subMeshes[groupId].dumpto(path);
         cur_round++;
@@ -19,7 +21,7 @@ void PartialEncoder::encode(int groupId, int round) {
     }
 }
 
-void PartialEncoder::encodeInsideOp(int groupId) {
+std::set<int> PartialEncoder::encodeInsideOp(int groupId) {
     MCGAL::Mesh& submesh = subMeshes[groupId];
     std::queue<int> gateQueue;
     gateQueue.push(seeds[groupId]->poolId);
@@ -57,15 +59,41 @@ void PartialEncoder::encodeInsideOp(int groupId) {
             vertexCut(submesh, boundaryIds, gateQueue, unconqueredVertexHE);
         }
     }
+    return boundaryIds;
     // if (removedCount != 0) {
     //     resetBfsState();
     //     compressRounds[groupId]++;
     //     encodeFacetSymbolOp(groupId);
     //     resetBfsState();
     //     encodeHalfedgeSymbolOp(groupId);
-    //     resetBfsState();
+    //                                                 resetBfsState();
     //     // encodeLocalBoundary(groupId, boundarys);
     // }
+}
+
+void PartialEncoder::encodeBoundaryOp(int groupId, std::set<int>& boundaryIds) {
+    for (int id : boundaryIds) {
+        MCGAL::Halfedge* hit = MCGAL::contextPool.getHalfedgeByIndex(id);
+        if (isBoundaryRemovable(hit)) {
+            MCGAL::Vertex* newv = subMeshes[groupId].halfedge_collapse(hit);
+
+            for (MCGAL::Halfedge* h : newv->halfedges) {
+                if (h->isBoundary()) {
+                    h->setCantCollapse();
+                    h->opposite->setCantCollapse();
+                }
+                if (h->face->groupId != h->opposite->face->groupId) {
+                    if (!h->isBoundary()) {
+                        h->setBoundary();
+                        h->setCantCollapse();
+                        h->opposite->setCantCollapse();
+                        h->opposite->setBoundary();
+                    } else {
+                    }
+                }
+            }
+        }
+    }
 }
 
 bool PartialEncoder::isRemovable(MCGAL::Vertex* v) {
@@ -160,6 +188,45 @@ void PartialEncoder::resetState(int groupId) {
             hit->resetState();
         }
     });
+}
+
+bool PartialEncoder::isBoundaryRemovable(MCGAL::Halfedge* h) {
+    bool res = false;
+    for (int i = 0; i < seeds.size(); i++) {
+        if (seeds[i]->poolId == h->poolId) {
+            return false;
+        }
+    }
+    std::set<int> poolIds;
+    for (MCGAL::Halfedge* hit : h->face->halfedges) {
+        if (poolIds.count(hit->opposite->face->poolId)) {
+            return false;
+        }
+        poolIds.insert(hit->opposite->face->poolId);
+    }
+    poolIds.clear();
+    for (MCGAL::Halfedge* hit : h->opposite->face->halfedges) {
+        if (poolIds.count(hit->opposite->face->poolId)) {
+            return false;
+        }
+        poolIds.insert(hit->opposite->face->poolId);
+    }
+    std::vector<MCGAL::Halfedge*> hs;
+    poolIds.clear();
+    for (MCGAL::Halfedge* hit : h->vertex->halfedges) {
+        if (poolIds.count(hit->end_vertex->poolId)) {
+            continue;
+        }
+        hs.push_back(hit);
+    }
+    for (MCGAL::Halfedge* hit : h->end_vertex->halfedges) {
+        if (poolIds.count(hit->end_vertex->poolId)) {
+            continue;
+        }
+        hs.push_back(hit);
+    }
+
+    return h->canCollapse() && !h->isRemoved() && h->face->facet_degree() == 3 && h->opposite->face->facet_degree() == 3 && !willViolateManifold(hs);
 }
 
 bool PartialEncoder::arePointsCoplanar(std::vector<MCGAL::Point>& points) {
