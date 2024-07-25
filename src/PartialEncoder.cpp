@@ -9,6 +9,22 @@ PartialEncoder::PartialEncoder(std::string path) {
     seeds = splitter.exportSeeds();
 }
 
+
+void PartialEncoder::encode(int round) {
+    int cur_round = 0;
+    while (cur_round < round) {
+        for (int i = 0; i < subMeshes.size(); i++) {
+            std::set<int> st = encodeInsideOp(i);
+            encodeBoundaryOp(i, st);
+            // std::string path = "./submesh1/group" + std::to_string(i) + "_round" + std::to_string(cur_round) + ".off";
+            std::string path = "./submesh1/round" + std::to_string(cur_round) + "_group" + std::to_string(i) + ".off";
+            subMeshes[i].dumpto(path);
+            resetState(i);
+        }
+        cur_round++;
+    }
+}
+
 void PartialEncoder::encode(int groupId, int round) {
     int cur_round = 0;
     while (cur_round < round) {
@@ -72,6 +88,7 @@ std::set<int> PartialEncoder::encodeInsideOp(int groupId) {
 }
 
 void PartialEncoder::encodeBoundaryOp(int groupId, std::set<int>& boundaryIds) {
+    // halfedge collapse
     for (int id : boundaryIds) {
         MCGAL::Halfedge* hit = MCGAL::contextPool.getHalfedgeByIndex(id);
         if (isBoundaryRemovable(hit)) {
@@ -94,6 +111,13 @@ void PartialEncoder::encodeBoundaryOp(int groupId, std::set<int>& boundaryIds) {
             }
         }
     }
+    // vertex removal
+    // for (int id : boundaryIds) {
+    //     MCGAL::Halfedge* hit = MCGAL::contextPool.getHalfedgeByIndex(id);
+    //     if (isBoundaryPoRemovable(hit->end_vertex)) {
+    //         // vertexCut(hit);
+    //     }
+    // }
 }
 
 bool PartialEncoder::isRemovable(MCGAL::Vertex* v) {

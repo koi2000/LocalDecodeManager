@@ -47,6 +47,8 @@ add_executable(MCGAL_Test tools/MCGAL_Test.cpp ${MINI_CGAL_FILES})
 
 add_executable(PartialEncoderTest tools/PartialEncoderTest.cpp ${LOCAL_COMPRESS_FILES} ${MINI_CGAL_FILES})
 
+add_executable(PartialDecoderTest tools/PartialDecoderTest.cpp ${LOCAL_COMPRESS_FILES} ${MINI_CGAL_FILES})
+
 add_executable(LocalSplitterTest tools/LocalSplitterTest.cpp ${LOCAL_COMPRESS_FILES} ${MINI_CGAL_FILES})
 
 add_executable(LocalEncoderTest tools/LocalEncoderTest.cpp ${LOCAL_COMPRESS_FILES} ${MINI_CGAL_FILES})

@@ -2,6 +2,7 @@
 #include "./include/BufferUtils.h"
 #include <fstream>
 #include <map>
+#define ENCODE_BOUNDARY 0
 
 inline bool cmpForder(MCGAL::Facet* f1, MCGAL::Facet* f2) {
     return f1->forder < f2->forder;
@@ -37,10 +38,12 @@ void LocalEncoder::encode() {
          * 先mergeboundary再执行具体的encode步骤
          * 解压缩时先decode再decode boundary
          */
-        if (j != 0 && j != 9) {
-            mergeBoundary();
-        }
-
+#ifdef ENCODE_BOUNDARY
+        // if (j != 0 && j != 9) {
+        //     mergeBoundaryByVertexRemoval();
+        // }
+        mergeBoundaryByVertexRemoval();
+#endif
         for (int i = 0; i < seeds.size(); i++) {
             int result = encodeOp(i);
         }
@@ -239,12 +242,16 @@ void LocalEncoder::dumpToBuffer() {
     }
     resetBfsState();
     dumpBoundaryToBuffer();
-    // 先让meta占据一部分位置，后续填充
+// 先让meta占据一部分位置，后续填充
+#ifdef ENCODE_BOUNDARY
     int prevDataOffset = dataOffset;
     dataOffset += schemaSizes.size() * sizeof(int) + sizeof(int);
+#endif
     dumpFacetSymbolToBuffer();
+#ifdef ENCODE_BOUNDARY
     int afterDataOffset = dataOffset;
     dumpBoundryMergeMessageToBuffer(prevDataOffset);
+#endif
     // dumpHalfedgeSymbolToBuffer();
 }
 
@@ -276,6 +283,144 @@ void LocalEncoder::dumpBoundaryToBuffer() {
     }
 }
 
+// 原则，黑色三角形一定是孤立的
+void LocalEncoder::mergeBoundaryByVertexRemoval() {
+    std::vector<int> newIds;
+    for (int i = 0; i < boundarys.size(); i++) {
+        MCGAL::Halfedge* hit = MCGAL::contextPool.getHalfedgeByIndex(boundarys[i]);
+        if (!hit->isRemoved() && hit->isBoundary()) {
+            if (boundaryPointRemovable(hit->end_vertex)) {
+                MCGAL::Halfedge* h = hit->opposite;
+                MCGAL::Halfedge* end(h);
+                do {
+                    MCGAL::Facet* f = h->face;
+                    assert(!f->isConquered() && !f->isRemoved());
+
+                    if (f->facet_degree() > 3) {
+                        MCGAL::Halfedge* hSplit(h->next);
+                        for (; hSplit->next->next != h; hSplit = hSplit->next)
+                            ;
+                        MCGAL::Halfedge* hCorner = mesh.split_facet(h, hSplit);
+                        // hCorner->face->setGroupId(67);
+                        for (MCGAL::Vertex* vit : hCorner->face->vertices) {
+                            vit->setConquered();
+                        }
+                        // hCorner->setAdded();
+                        MCGAL::Facet* fit = hCorner->opposite->face;
+                        // 这个也需要投票
+                        std::map<int, int> wc;
+                        for (MCGAL::Halfedge* bit : fit->halfedges) {
+                            if (bit == hCorner->opposite)
+                                continue;
+                            if (wc.count(bit->opposite->face->groupId)) {
+                                wc[bit->opposite->face->groupId]++;
+                            } else {
+                                wc[bit->opposite->face->groupId] = 1;
+                            }
+                        }
+                        int maxKeys = -1;
+                        int maxValue = -1;
+                        for (const auto& [key, value] : wc) {
+                            if (value > maxValue) {
+                                maxValue = value;
+                                maxKeys = key;
+                            }
+                        }
+                        fit->setGroupId(maxKeys);
+                        for (MCGAL::Halfedge* bit : fit->halfedges) {
+                            bit->vertex->setConquered();
+                            if (maxKeys != bit->opposite->face->groupId) {
+                                bit->setBoundary();
+                                bit->opposite->setBoundary();
+                            } else {
+                                bit->setNotBoundary();
+                                bit->opposite->setNotBoundary();
+                            }
+                        }
+                        // fit = hCorner->face;
+                        // // 这个也需要投票
+                        wc.clear();
+                        for (MCGAL::Halfedge* bit : fit->halfedges) {
+                            if (bit == hCorner)
+                                continue;
+                            if (wc.count(bit->opposite->face->groupId)) {
+                                wc[bit->opposite->face->groupId]++;
+                            } else {
+                                wc[bit->opposite->face->groupId] = 1;
+                            }
+                        }
+                        maxKeys = -1;
+                        maxValue = -1;
+                        for (const auto& [key, value] : wc) {
+                            if (value > maxValue) {
+                                maxValue = value;
+                                maxKeys = key;
+                            }
+                        }
+                        fit->setGroupId(maxKeys);
+                        for (MCGAL::Halfedge* bit : fit->halfedges) {
+                            bit->vertex->setConquered();
+                            if (maxKeys != bit->opposite->face->groupId) {
+                                bit->setBoundary();
+                                bit->opposite->setBoundary();
+                            } else {
+                                bit->setNotBoundary();
+                                bit->opposite->setNotBoundary();
+                            }
+                        }
+                    }
+                    // h->end_vertex->setConquered();
+
+                } while ((h = h->opposite->next) != end);
+
+                MCGAL::Halfedge* hNewFace = mesh.erase_center_vertex(hit);
+                MCGAL::Facet* added_face = hNewFace->face;
+                // 新增一个投票环节
+                std::map<int, int> wc;
+                for (MCGAL::Halfedge* bit : added_face->halfedges) {
+                    if (wc.count(bit->opposite->face->groupId)) {
+                        wc[bit->opposite->face->groupId]++;
+                    } else {
+                        wc[bit->opposite->face->groupId] = 1;
+                    }
+                }
+                int maxKeys = -1;
+                int maxValue = -1;
+
+                for (const auto& [key, value] : wc) {
+                    if (value > maxValue) {
+                        maxValue = value;
+                        maxKeys = key;
+                    }
+                }
+                hNewFace->setGroupId(maxKeys);
+                for (MCGAL::Halfedge* bit : added_face->halfedges) {
+                    bit->vertex->setConquered();
+                    // bit->setBoundary();
+                    // bit->opposite->setBoundary();
+                    if (bit->face->groupId != bit->opposite->face->groupId) {
+                        bit->setBoundary();
+                        bit->opposite->setBoundary();
+                        newIds.push_back(bit->poolId);
+                        newIds.push_back(bit->opposite->poolId);
+                        // boundarys.push_back(bit->poolId);
+                        // boundarys.push_back(bit->opposite->poolId);
+                    } else {
+                        bit->setNotBoundary();
+                        bit->opposite->setNotBoundary();
+                    }
+                }
+            }
+        }
+    }
+    auto boundaryEnd = std::remove_if(boundarys.begin(), boundarys.end(), [](int hid) {
+        MCGAL::Halfedge* hit = MCGAL::contextPool.getHalfedgeByIndex(hid);
+        return hit->isRemoved() || !hit->isBoundary();
+    });
+    boundarys.resize(std::distance(boundarys.begin(), boundaryEnd));
+    boundarys.insert(boundarys.end(), newIds.begin(), newIds.end());
+}
+
 /**
  * encode boundary格式
  * vid    合并所得点的id
@@ -283,12 +428,12 @@ void LocalEncoder::dumpBoundaryToBuffer() {
  * bitmap 连接信息
  * bitmap 哪些是原来的boundary
  */
-void LocalEncoder::mergeBoundary() {
+void LocalEncoder::mergeBoundaryByHalfedgeCopplpse() {
     std::deque<EncodeBoundarySchema> schemaQueue;
     int schemaSize = 0;
     for (int i = 0; i < boundarys.size(); i++) {
         MCGAL::Halfedge* hit = MCGAL::contextPool.getHalfedgeByIndex(boundarys[i]);
-        bool res = boundaryRemovable(hit);
+        bool res = boundaryHalfedgeRemovable(hit);
         if (res) {
             EncodeBoundarySchema schema;
             schema.setVid(hit->vertex->id);
@@ -507,6 +652,8 @@ void LocalEncoder::resetState() {
                 if (hit->face->groupId != hit->opposite->face->groupId) {
                     hit->setBoundary();
                     // assert(hit->isBoundary());
+                } else {
+                    hit->setNotBoundary();
                 }
                 hit->resetState();
             }
@@ -672,7 +819,36 @@ bool LocalEncoder::areHalfedgesCoplanar(std::vector<MCGAL::Halfedge*>& halfedges
     return true;
 }
 
-bool LocalEncoder::boundaryRemovable(MCGAL::Halfedge* h) {
+bool LocalEncoder::boundaryPointRemovable(MCGAL::Vertex* v) {
+    // for (MCGAL::Halfedge* hit : v->halfedges) {
+    //     if (hit->face->facet_degree() != 3) {
+    //         return false;
+    //     }
+    // }
+    if (v->isConquered()) {
+        return false;
+    }
+    if (v->vertex_degree() > 2 && v->vertex_degree() <= 8 && v->vertex_degree() % 2 == 1) {
+        std::vector<MCGAL::Point> vh_oneRing;
+        std::vector<MCGAL::Halfedge*> heh_oneRing;
+        heh_oneRing.reserve(v->vertex_degree());
+        for (MCGAL::Halfedge* hit : v->halfedges) {
+            if (hit->end_vertex->isConquered()) {
+                return false;
+            }
+            vh_oneRing.push_back(hit->opposite->vertex->point());
+            heh_oneRing.push_back(hit);
+        }
+        bool removable = !willViolateManifold(heh_oneRing);  // && arePointsCoplanar(vh_oneRing);
+        // if (removable) {
+        //     return checkCompetition(v);
+        // }
+        return removable;
+    }
+    return false;
+}
+
+bool LocalEncoder::boundaryHalfedgeRemovable(MCGAL::Halfedge* h) {
     bool res = false;
     for (int i = 0; i < seeds.size(); i++) {
         if (seeds[i]->poolId == h->poolId) {
@@ -709,26 +885,6 @@ bool LocalEncoder::boundaryRemovable(MCGAL::Halfedge* h) {
     }
 
     return h->canCollapse() && !h->isRemoved() && h->face->facet_degree() == 3 && h->opposite->face->facet_degree() == 3 && !willViolateManifold(hs);
-    // for (MCGAL::Halfedge* hit : v->halfedges) {
-    //     if (hit->face->facet_degree() != 3) {
-    //         return false;
-    //     }
-    // }
-    // if (v->vertex_degree() > 2 && v->vertex_degree() <= 8) {
-    //     std::vector<MCGAL::Point> vh_oneRing;
-    //     std::vector<MCGAL::Halfedge*> heh_oneRing;
-    //     heh_oneRing.reserve(v->vertex_degree());
-    //     for (MCGAL::Halfedge* hit : v->halfedges) {
-    //         vh_oneRing.push_back(hit->opposite->vertex->point());
-    //         heh_oneRing.push_back(hit);
-    //     }
-    //     bool removable = !willViolateManifold(heh_oneRing);  // && arePointsCoplanar(vh_oneRing);
-    //     // if (removable) {
-    //     //     return checkCompetition(v);
-    //     // }
-    //     return removable;
-    // }
-    // return false;
 }
 
 MCGAL::Point LocalEncoder::crossProduct(const MCGAL::Point& a, const MCGAL::Point& b) {

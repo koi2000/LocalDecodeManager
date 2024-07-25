@@ -5,11 +5,20 @@
 #include "core.h"
 #include <string>
 
+/**
+ * 修改encoder，直接分割压缩 使用vertex removal，找个办法记下来
+ * 同时根据点记录三group交界处
+ * 
+ * 边界在decode的时候需要对齐，自己maintain三个点
+*/
+
 class PartialEncoder {
   public:
     PartialEncoder(std::string path);
 
     void encode(int groupId, int round);
+
+    void encode(int round);
 
     std::set<int> encodeInsideOp(int groupId);
 

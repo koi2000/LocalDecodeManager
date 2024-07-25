@@ -45,7 +45,14 @@ class LocalEncoder {
 
     void encodeLocalBoundary(int groupId, std::vector<int>& boundarys);
 
-    bool boundaryRemovable(MCGAL::Halfedge* h);
+    bool boundaryHalfedgeRemovable(MCGAL::Halfedge* h);
+    
+    bool boundaryPointRemovable(MCGAL::Vertex* v);
+
+    void mergeBoundaryByHalfedgeCopplpse();
+
+    void mergeBoundaryByVertexRemoval();
+
     // 为网格设置边界
     void markBoundry();
 
