@@ -8,9 +8,9 @@
 /**
  * 修改encoder，直接分割压缩 使用vertex removal，找个办法记下来
  * 同时根据点记录三group交界处
- * 
+ *
  * 边界在decode的时候需要对齐，自己maintain三个点
-*/
+ */
 
 class PartialEncoder {
   public:
@@ -20,9 +20,9 @@ class PartialEncoder {
 
     void encode(int round);
 
-    std::set<int> encodeInsideOp(int groupId);
+    void encodeInsideOp(int groupId);
 
-    void encodeBoundaryOp(int groupId, std::set<int>& boundaryIds);
+    void encodeBoundaryOp(int groupId);
 
   private:
     void resetState(int groupId);
@@ -30,6 +30,10 @@ class PartialEncoder {
     bool isRemovable(MCGAL::Vertex* v);
 
     MCGAL::Halfedge* vertexCut(MCGAL::Mesh& mesh, std::set<int>& boundaryIds, std::queue<int>& gateQueue, MCGAL::Halfedge* startH);
+
+    bool boundaryRemovableInVertexRemoval(int ogroupId, MCGAL::Halfedge* hit);
+
+    void dumpSubMeshAndNeighbour(int groupId, int round);
 
     // void dumpToBuffer();
 
@@ -59,25 +63,24 @@ class PartialEncoder {
 
     bool checkCompetition(MCGAL::Vertex* v) const;
 
-    // bool isConvex(const std::vector<MCGAL::Vertex*>& polygon) const;
-
     bool arePointsCoplanar(std::vector<MCGAL::Point>& points);
-
-    // bool areHalfedgesCoplanar(std::vector<MCGAL::Halfedge*>& halfedges);
-
-    // MCGAL::Point crossProduct(const MCGAL::Point& a, const MCGAL::Point& b);
 
     bool isPlanar(const std::vector<MCGAL::Vertex*>& polygon, float epsilon) const;
 
     bool willViolateManifold(const std::vector<MCGAL::Halfedge*>& polygon) const;
 
+    bool willViolateManifoldInDup(const std::vector<MCGAL::Halfedge*>& polygon) const;
+
   private:
+    Graph graph;
     MCGAL::Mesh mesh;
     LocalSplitter splitter;
     std::vector<MCGAL::Mesh> subMeshes;
     std::vector<MCGAL::Halfedge*> seeds;
     // 每个group的压缩轮数
     std::vector<int> compressRounds;
+    std::unordered_map<int, int> dup2origin;
+    std::unordered_map<int, std::unordered_map<int, int>> origin2dup;
 };
 
 #endif

@@ -1,4 +1,5 @@
 // g++ -v -E -x c++ -
+// sudo update-alternatives --config gcc
 // sudo update-alternatives --install /usr/bin/gcc gcc /usr/local/gcc-12/bin/gcc 71
 {
     "configurations": [

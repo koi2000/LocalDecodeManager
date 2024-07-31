@@ -648,9 +648,16 @@ inline bool isFacetRemovable(MCGAL::Facet* fit) {
     return fit->isRemoved();
 }
 
+inline bool isVertexRemovable(MCGAL::Vertex* vit) {
+    return vit->isRemoved();
+}
+
 void Mesh::dumpto(std::string path) {
     auto newEnd = std::remove_if(faces.begin(), faces.end(), isFacetRemovable);
     faces.resize(std::distance(faces.begin(), newEnd));
+
+    auto newVEnd = std::remove_if(vertices.begin(), vertices.end(), isVertexRemovable);
+    vertices.resize(std::distance(vertices.begin(), newVEnd));
 
     std::ofstream offFile(path);
     if (!offFile.is_open()) {
@@ -674,8 +681,15 @@ void Mesh::dumpto(std::string path) {
         offFile << face->vertices.size() << " ";
         Halfedge* hst = *face->halfedges.begin();
         Halfedge* hed = *face->halfedges.begin();
+        int cnt = 0;
         do {
             offFile << hst->vertex->getVid() << " ";
+            if (hst->vertex->getVid() == 0) {
+                cnt++;
+                if (cnt >= 2) {
+                    int i = 0;
+                }
+            }
             hst = hst->next;
         } while (hst != hed);
 

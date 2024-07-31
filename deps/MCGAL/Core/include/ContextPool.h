@@ -57,6 +57,10 @@ class ContextPool {
         return *vindex;
     }
 
+    MCGAL::Vertex* getVertexByVid(int vid) {
+        return &vpool[vid2PoolId[vid]];
+    }
+
     MCGAL::Vertex* getVertexByIndex(int index) {
         return &vpool[index];
     }

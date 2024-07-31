@@ -26,6 +26,7 @@ class Halfedge {
     Halfedge(){};
     Vertex* vertex = nullptr;
     Vertex* end_vertex = nullptr;
+    Vertex* removedVertex = nullptr;
     Facet* face = nullptr;
     Halfedge* next = nullptr;
     Halfedge* opposite = nullptr;
@@ -44,7 +45,13 @@ class Halfedge {
     void setMeshId(int meshId) {
         this->meshId = meshId;
     }
+
+    void setRemovedVertex(Vertex* v) {
+        this->removedVertex = v;
+    }
+
     void setVertex(Vertex* v1, Vertex* v2);
+    
     void reset(Vertex* v1, Vertex* v2);
 
     inline void resetBfsFlag() {

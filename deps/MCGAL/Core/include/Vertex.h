@@ -33,6 +33,7 @@ class Vertex : public Point {
     int vid_ = 0;
     int poolId = -1;
     int meshId = -1;
+    int groupId = -1;
     std::vector<Halfedge*> halfedges;
     // std::set<Halfedge*> opposite_half_edges;
     // std::unordered_set<Halfedge*> halfedges;
@@ -52,6 +53,10 @@ class Vertex : public Point {
 
     void setVid(int id) {
         this->vid_ = id;
+    }
+
+    void setGroupId(int id) {
+        this->groupId = id;
     }
 
     int getVid() {

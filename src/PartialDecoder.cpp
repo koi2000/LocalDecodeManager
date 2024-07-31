@@ -11,7 +11,7 @@ PartialDecoder::PartialDecoder(std::string path) {
     splitter.split(seeds.size());
     subMeshes = splitter.exportSubMeshes();
     graph = splitter.exportGraph();
-    dup2origin = splitter.exportDupMap();
+    // dup2origin = splitter.exportDupMap();
     // seeds = splitter.exportSeeds();
 }
 
@@ -46,9 +46,9 @@ void PartialDecoder::decode(int groupId, int lod) {
     }
     // decode neighbor
     auto node = graph.getNode(groupId);
-    for (int gid : node) {
-        decode(gid, lod - 1);
-    }
+    // for (int gid : node) {
+    //     decode(gid, lod - 1);
+    // }
 }
 
 std::vector<int> PartialDecoder::decodeFacetSymbolOp(int groupId, std::vector<MCGAL::Halfedge*>& boundarys) {

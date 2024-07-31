@@ -2,15 +2,14 @@
 #define LOCAL_SPLITTER_H
 
 #include "EncodeBoundarySchema.h"
-#include "biops.h"
 #include "core.h"
-#include "syncbitops.h"
 #include <Graph.h>
 #include <cstring>
 #include <queue>
 #include <random>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #define RANDOM_SEED 1035
@@ -24,11 +23,13 @@ class LocalSplitter {
 
     LocalSplitter(std::string filename);
 
-    LocalSplitter(MCGAL::Mesh* mesh);
+    void buildGraph();
 
-    void loadMesh(MCGAL::Mesh* mesh);
+    LocalSplitter(MCGAL::Mesh* mesh, bool skipMarkBoundary = false);
 
-    void split();
+    void loadMesh(MCGAL::Mesh* mesh, bool skipMarkBoundary = false);
+
+    void split(int groupNumber = -1);
 
     void dumpSubMesh(std::string path, int groupId);
 
@@ -38,6 +39,10 @@ class LocalSplitter {
 
     std::vector<MCGAL::Mesh>& exportSubMeshes();
 
+    std::unordered_map<int, int>& exportDup2Origin();
+
+    std::unordered_map<int, std::unordered_map<int, int>>& exportOrigin2Dup();
+
   private:
     void markBoundry();
 
@@ -46,6 +51,13 @@ class LocalSplitter {
     std::vector<int> unRemovedPoint;
     std::vector<MCGAL::Mesh> subMeshes;
     std::vector<MCGAL::Halfedge*> seeds;
+    std::vector<std::set<int>> triJunction;
+    std::unordered_map<int, int> dup2origin;
+    /**
+     * key为groupId
+     * value 为origin到新点的集合，其中有pair first为groupId，second为dup的id
+     */
+    std::unordered_map<int, std::unordered_map<int, int>> origin2dup;
     Graph g;
 };
 
