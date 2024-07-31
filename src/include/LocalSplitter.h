@@ -11,6 +11,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "omp.h"
 
 #define RANDOM_SEED 1035
 

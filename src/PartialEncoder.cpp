@@ -169,7 +169,7 @@ void PartialEncoder::encodeBoundaryOp(int groupId) {
         // }
         // MCGAL::Halfedge* ed = boundary;
         int stopId = origin2dup[node.stop][groupId];
-
+        // NEW_boundary 可能有·问题
         int cnt = 0;
         do {
             if (boundaryRemovableInVertexRemoval(node.neighbour, boundary)) {
@@ -178,6 +178,11 @@ void PartialEncoder::encodeBoundaryOp(int groupId) {
                     boundary->end_vertex->setRemoved();
                     boundary->next->next->opposite->setRemovedVertex(boundary->end_vertex);
                     boundary->next->next->opposite->setBoundary();
+                    for (MCGAL::Halfedge* hit : boundary->face->halfedges) {
+                        hit->setRemoved();
+                        hit->vertex->eraseHalfedgeByPointer(hit);
+                    }
+                    MCGAL::Halfedge* new_boundary = boundary->next->next->opposite;
                     // 这两个点之间构造一个边
                     MCGAL::Vertex* v1 = boundary->vertex;
                     MCGAL::Vertex* v2 = boundary->next->end_vertex;
@@ -189,10 +194,11 @@ void PartialEncoder::encodeBoundaryOp(int groupId) {
                     MCGAL::Vertex* ov1 = MCGAL::contextPool.getVertexByVid(oppoVid1);
                     MCGAL::Vertex* ov2 = MCGAL::contextPool.getVertexByVid(oppoVid2);
                     /**
-                     * 指向关系应该是 removedVretex-> v2 -> v1
+                     * 指向关系应该是 removedVertex-> v2 -> v1
                      */
                     // 找到问题，不符合流行结构，需要进行检测
                     MCGAL::Facet* onew_face = MCGAL::contextPool.allocateFaceFromPool({removedVertex, ov2, ov1});
+                    onew_face->setGroupId(node.neighbour);
                     MCGAL::Halfedge* startH;
                     for (MCGAL::Halfedge* hit : ov1->halfedges) {
                         if (hit->end_vertex == removedVertex) {
@@ -227,6 +233,7 @@ void PartialEncoder::encodeBoundaryOp(int groupId) {
                     MCGAL::Halfedge* newH = subMeshes[node.neighbour].erase_center_vertex(startH);
                     newH->face->setGroupId(node.neighbour);
                     subMeshes[node.neighbour].add_face(newH->face);
+                    boundary = new_boundary;
                 } else if (boundary->face->facet_degree() > 3) {
                     // 这两个点之间构造一个边
                     MCGAL::Vertex* v1 = boundary->vertex;
@@ -287,6 +294,7 @@ void PartialEncoder::encodeBoundaryOp(int groupId) {
                     MCGAL::Halfedge* newH = subMeshes[node.neighbour].erase_center_vertex(startH);
                     newH->face->setGroupId(node.neighbour);
                     subMeshes[node.neighbour].add_face(newH->face);
+                    // boundary = new_boundary;
                 }
             }
             if (boundary->end_vertex->id == stopId) {
@@ -457,7 +465,7 @@ bool PartialEncoder::isRemovable(MCGAL::Vertex* v) {
             vh_oneRing.push_back(hit->opposite->vertex->point());
             heh_oneRing.push_back(hit);
         }
-        bool removable = !willViolateManifold(heh_oneRing) && arePointsCoplanar(vh_oneRing);
+        bool removable = /*!willViolateManifold(heh_oneRing) && */ arePointsCoplanar(vh_oneRing);
         // if (removable) {
         //     return checkCompetition(v);
         // }

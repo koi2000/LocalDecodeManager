@@ -46,6 +46,7 @@ add_executable(MCGAL_Test tools/MCGAL_Test.cpp ${MINI_CGAL_FILES})
 # target_link_libraries(MCGAL_Test /usr/local/lib/libMCGAL.so)
 
 add_executable(PartialEncoderTest tools/PartialEncoderTest.cpp ${LOCAL_COMPRESS_FILES} ${MINI_CGAL_FILES})
+target_link_libraries(PartialEncoderTest OpenMP::OpenMP_CXX)
 
 add_executable(PartialDecoderTest tools/PartialDecoderTest.cpp ${LOCAL_COMPRESS_FILES} ${MINI_CGAL_FILES})
 

@@ -68,10 +68,12 @@ void LocalSplitter::split(int groupNumber) {
         subMeshes.resize(groupNumber);
     }
     buildGraph();
+#pragma omp parallel for
     for (int i = 0; i < subMeshes.size(); i++) {
         // subMeshes[i].faces.resize(mesh->size_of_facets());
         std::copy_if(mesh->faces.begin(), mesh->faces.end(), std::back_inserter(subMeshes[i].faces), [&i](const MCGAL::Facet* f) { return f->groupId == i; });
     }
+#pragma omp parallel for
     for (size_t i = 0; i < subMeshes.size(); i++) {
         std::map<int, int> id2id;
         std::set<int> uniqueIds;
@@ -84,21 +86,27 @@ void LocalSplitter::split(int groupNumber) {
                     if (id2id.count(hit->vertex->poolId)) {
                         dup1 = MCGAL::contextPool.getVertexByIndex(id2id[hit->vertex->poolId]);
                     } else {
-                        dup1 = MCGAL::contextPool.dupVertexFromPool(hit->vertex);
-                        id2id[hit->vertex->poolId] = dup1->poolId;
-                        uniqueIds.insert(dup1->poolId);
-                        dup2origin[dup1->id] = hit->vertex->id;
-                        origin2dup[hit->vertex->id].insert({i, dup1->id});
+#pragma omp critical
+                        {
+                            dup1 = MCGAL::contextPool.dupVertexFromPool(hit->vertex);
+                            id2id[hit->vertex->poolId] = dup1->poolId;
+                            uniqueIds.insert(dup1->poolId);
+                            dup2origin[dup1->id] = hit->vertex->id;
+                            origin2dup[hit->vertex->id].insert({i, dup1->id});
+                        }
                     }
 
                     if (id2id.count(hit->end_vertex->poolId)) {
                         dup2 = MCGAL::contextPool.getVertexByIndex(id2id[hit->end_vertex->poolId]);
                     } else {
-                        dup2 = MCGAL::contextPool.dupVertexFromPool(hit->end_vertex);
-                        id2id[hit->end_vertex->poolId] = dup2->poolId;
-                        uniqueIds.insert(dup2->poolId);
-                        dup2origin[dup2->id] = hit->end_vertex->id;
-                        origin2dup[hit->end_vertex->id].insert({i, dup2->id});
+#pragma omp critical
+                        {
+                            dup2 = MCGAL::contextPool.dupVertexFromPool(hit->end_vertex);
+                            id2id[hit->end_vertex->poolId] = dup2->poolId;
+                            uniqueIds.insert(dup2->poolId);
+                            dup2origin[dup2->id] = hit->end_vertex->id;
+                            origin2dup[hit->end_vertex->id].insert({i, dup2->id});
+                        }
                     }
                 }
             }
@@ -133,20 +141,16 @@ void LocalSplitter::split(int groupNumber) {
 
                     hit->vertex = dup;
                 }
+                /**
+                 * v2 -> v1是boundary
+                 * v2 -> v4是boundary
+                 *   v1       _v3
+                 *     \      /|
+                 *     _\|   /
+                 *        v2 ----> v4  
+                */
                 if (id2id.count(hit->end_vertex->poolId)) {
                     hit->end_vertex = MCGAL::contextPool.getVertexByIndex(id2id[hit->end_vertex->poolId]);
-                    // if (hit->opposite->face->groupId == i) {
-                    //     bool flag = true;
-                    //     for (MCGAL::Halfedge* dupit : hit->end_vertex->halfedges) {
-                    //         if (dupit == hit->opposite) {
-                    //             flag = false;
-                    //             break;
-                    //         }
-                    //     }
-                    //     if (flag) {
-                    //         hit->end_vertex->halfedges.push_back(hit->opposite);
-                    //     }
-                    // }
                 }
             }
             for (int j = 0; j < fit->halfedges.size(); j++) {
