@@ -14,6 +14,7 @@
 #include "omp.h"
 
 #define RANDOM_SEED 1035
+// #define RANDOM_SEED 1034
 
 /**
  * 内存中需要构建一个图结构，点是subMesh，边指的是两个subMesh之间有邻接关系

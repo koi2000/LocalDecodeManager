@@ -2,20 +2,29 @@
 #include <algorithm>
 #include <map>
 
-inline MCGAL::Halfedge* next_boundary(int groupId, MCGAL::Halfedge* boundary) {
+inline MCGAL::Halfedge* next_boundary(int inner, int outer, MCGAL::Halfedge* boundary) {
     MCGAL::Halfedge* nxt = boundary->next;
     if (nxt->isBoundary()) {
-        return nxt;
+        if (nxt->face->groupId == inner && nxt->opposite->face->groupId == outer) {
+            return nxt;
+        } else {
+            return nullptr;
+        }
     }
     nxt = boundary->next->opposite->next;
     if (nxt->isBoundary()) {
-        return nxt;
+        if (nxt->face->groupId == inner && nxt->opposite->face->groupId == outer) {
+            return nxt;
+        } else {
+            return nullptr;
+        }
     }
     for (MCGAL::Halfedge* hit : boundary->end_vertex->halfedges) {
-        if (hit->opposite != boundary && hit->isBoundary() && hit->face->groupId == groupId) {
+        if (hit->opposite != boundary && hit->isBoundary() && hit->face->groupId == inner && hit->opposite->face->groupId == outer) {
             return hit;
         }
     }
+    return nullptr;
 }
 
 LocalSplitter::LocalSplitter(std::string filename) {
@@ -147,8 +156,8 @@ void LocalSplitter::split(int groupNumber) {
                  *   v1       _v3
                  *     \      /|
                  *     _\|   /
-                 *        v2 ----> v4  
-                */
+                 *        v2 ----> v4
+                 */
                 if (id2id.count(hit->end_vertex->poolId)) {
                     hit->end_vertex = MCGAL::contextPool.getVertexByIndex(id2id[hit->end_vertex->poolId]);
                 }
@@ -183,13 +192,28 @@ void LocalSplitter::buildGraph() {
     for (MCGAL::Vertex* vit : triPoints) {
         for (MCGAL::Halfedge* hit : vit->halfedges) {
             if (hit->isBoundary()) {
+                // if (triPoints.count(hit->vertex) && triPoints.count(hit->end_vertex)) {
+                //     g.addHEdge(hit->face->groupId, {hit->vertex->id, hit->end_vertex->id, hit->opposite->face->groupId, hit->end_vertex->id});
+                //     continue;
+                // }
                 MCGAL::Halfedge* st = hit;
-                int groupId = st->face->groupId;
+                int inner = st->face->groupId;
+                int outer = st->opposite->face->groupId;
+                int dis = 0;
                 do {
                     assert(st->isBoundary());
-                    st = next_boundary(groupId, st);
-                } while (!triPoints.count(st->end_vertex));
-                g.addEdge({hit->vertex->id, hit->end_vertex->id, hit->opposite->face->groupId, st->end_vertex->id}, {st->end_vertex->id, st->vertex->id, hit->face->groupId, hit->vertex->id});
+                    MCGAL::Halfedge* ed = st;
+                    if (triPoints.count(st->end_vertex)) {
+                        int i = 0;
+                    }
+                    st = next_boundary(inner, outer, st);
+
+                    if (st == nullptr) {
+                        g.addHEdge(inner, outer, {hit->vertex->id, hit->end_vertex->id, ed->end_vertex->id});
+                    }
+                    dis++;
+                } while (st != nullptr);
+                // g.addEdge({hit->vertex->id, hit->end_vertex->id, hit->opposite->face->groupId, st->end_vertex->id}, {st->end_vertex->id, st->vertex->id, hit->face->groupId, hit->vertex->id});
             }
         }
     }

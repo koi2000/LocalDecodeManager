@@ -27,13 +27,15 @@ class PartialEncoder {
   private:
     void resetState(int groupId);
 
-    bool isRemovable(MCGAL::Vertex* v);
+    bool isRemovable(int groupId, MCGAL::Vertex* v);
 
     MCGAL::Halfedge* vertexCut(MCGAL::Mesh& mesh, std::set<int>& boundaryIds, std::queue<int>& gateQueue, MCGAL::Halfedge* startH);
 
-    bool boundaryRemovableInVertexRemoval(int ogroupId, MCGAL::Halfedge* hit);
+    bool boundaryRemovableInVertexRemoval(int inner, int outer, MCGAL::Halfedge* hit);
 
-    void dumpSubMeshAndNeighbour(int groupId, int round);
+    void dumpSubMeshNeighbour(int groupId, int round);
+
+    MCGAL::Halfedge* next_boundary(int ogroupId, MCGAL::Halfedge* boundary);
 
     // void dumpToBuffer();
 
@@ -69,7 +71,7 @@ class PartialEncoder {
 
     bool willViolateManifold(const std::vector<MCGAL::Halfedge*>& polygon) const;
 
-    bool willViolateManifoldInDup(const std::vector<MCGAL::Halfedge*>& polygon) const;
+    bool willViolateManifoldInDup(int inner, int outer, const std::vector<MCGAL::Halfedge*>& inner_oneRing, const std::vector<MCGAL::Halfedge*>& outer_oneRing) ;
 
   private:
     Graph graph;

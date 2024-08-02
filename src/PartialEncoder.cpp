@@ -1,20 +1,27 @@
 #include "./include/PartialEncoder.h"
 #include <iostream>
 
-inline MCGAL::Halfedge* next_boundary(int groupId, MCGAL::Halfedge* boundary) {
+MCGAL::Halfedge* PartialEncoder::next_boundary(int ogroupId, MCGAL::Halfedge* boundary) {
     MCGAL::Halfedge* nxt = boundary->next;
     if (nxt->isBoundary()) {
+        auto ddd = origin2dup[dup2origin[nxt->end_vertex->id]];
+        assert(origin2dup[dup2origin[nxt->end_vertex->id]].count(ogroupId));
         return nxt;
     }
     nxt = boundary->next->opposite->next;
     if (nxt->isBoundary()) {
+        auto ddd = origin2dup[dup2origin[nxt->end_vertex->id]];
+        assert(origin2dup[dup2origin[nxt->end_vertex->id]].count(ogroupId));
         return nxt;
     }
     for (MCGAL::Halfedge* hit : boundary->end_vertex->halfedges) {
-        if (hit->opposite != boundary && hit->isBoundary() && hit->face->groupId == groupId) {
+        if (hit->opposite != boundary && hit->isBoundary()) {
+            auto ddd = origin2dup[dup2origin[nxt->end_vertex->id]];
+            assert(origin2dup[dup2origin[hit->end_vertex->id]].count(ogroupId));
             return hit;
         }
     }
+    return nullptr;
 }
 
 PartialEncoder::PartialEncoder(std::string path) {
@@ -33,11 +40,19 @@ void PartialEncoder::encode(int round) {
     while (cur_round < round) {
         for (int i = 0; i < subMeshes.size(); i++) {
             encodeInsideOp(i);
+            resetState(i);
+        }
+        for (int i = 0; i < subMeshes.size(); i++) {
             encodeBoundaryOp(i);
-            // std::string path = "./submesh1/group" + std::to_string(i) + "_round" + std::to_string(cur_round) + ".off";
+        }
+        for (int i = 0; i < subMeshes.size(); i++) {
             std::string path = "./submesh1/round" + std::to_string(cur_round) + "_group" + std::to_string(i) + ".off";
             subMeshes[i].dumpto(path);
             resetState(i);
+            std::unordered_map<int, Node>& nodes = graph.getNode(i);
+            for (auto& [_, node] : nodes) {
+                node.setUnvisiable();
+            }
         }
         cur_round++;
     }
@@ -52,16 +67,16 @@ void PartialEncoder::encode(int groupId, int round) {
         encodeBoundaryOp(groupId);
         std::string path = "./submesh2/round" + std::to_string(cur_round) + "_group" + std::to_string(groupId) + ".off";
         subMeshes[groupId].dumpto(path);
-        dumpSubMeshAndNeighbour(groupId, cur_round);
+        dumpSubMeshNeighbour(groupId, cur_round);
         cur_round++;
         resetState(groupId);
     }
 }
 
-void PartialEncoder::dumpSubMeshAndNeighbour(int groupId, int round) {
-    std::unordered_set<Node, Hasher> nodes = graph.getNode(groupId);
-    for (Node node : nodes) {
-        int id = node.neighbour;
+void PartialEncoder::dumpSubMeshNeighbour(int groupId, int round) {
+    std::unordered_map<int, Node> nodes = graph.getNode(groupId);
+    for (auto& [neighbourId, node] : nodes) {
+        int id = neighbourId;
         std::string path = "./submesh2/round" + std::to_string(round) + "_group" + std::to_string(id) + ".off";
         subMeshes[id].dumpto(path);
     }
@@ -84,7 +99,7 @@ void PartialEncoder::encodeInsideOp(int groupId) {
         bool hasRemovable = false;
         MCGAL::Halfedge* unconqueredVertexHE;
         for (MCGAL::Halfedge* hh = h->next; hh != h; hh = hh->next) {
-            if (isRemovable(hh->end_vertex) && !hh->isBoundary() && !hh->opposite->isBoundary()) {
+            if (isRemovable(groupId, hh->end_vertex) && !hh->isBoundary() && !hh->opposite->isBoundary()) {
                 hasRemovable = true;
                 unconqueredVertexHE = hh;
                 break;
@@ -141,8 +156,12 @@ void PartialEncoder::encodeBoundaryOp(int groupId) {
     // }
 
     // vertex removal
-    std::unordered_set<Node, Hasher>& nodes = graph.getNode(groupId);
-    for (Node node : nodes) {
+    std::unordered_map<int, Node>& nodes = graph.getNode(groupId);
+    for (auto& [neighbourId, node] : nodes) {
+        if (node.isVisiable()) {
+            continue;
+        }
+        node.setVisiable();
         std::unordered_map<int, int>& groupId2dup = origin2dup[node.st];
         int dupId = groupId2dup[groupId];
         int poolId = MCGAL::contextPool.vid2PoolId[dupId];
@@ -151,11 +170,21 @@ void PartialEncoder::encodeBoundaryOp(int groupId) {
         for (MCGAL::Halfedge* hit : vt->halfedges) {
             if (hit->isBoundary()) {
                 if (dup2origin[hit->end_vertex->id] == node.ed) {
+                    auto ddd = origin2dup[node.ed];
                     boundary = hit;
                     break;
                 }
             }
         }
+
+        std::unordered_map<int, Node>& neighbour_nodes = graph.getNode(neighbourId);
+        for (auto& [key, nd] : neighbour_nodes) {
+            if (key == groupId) {
+                nd.setVisiable();
+                break;
+            }
+        }
+
         // 规定了走向后，也要规定什么时候结束
         // int edPoolId = -1;
         // std::unordered_set<Node, Hasher> neighboures = graph.getNode(node.neighbour);
@@ -172,7 +201,7 @@ void PartialEncoder::encodeBoundaryOp(int groupId) {
         // NEW_boundary 可能有·问题
         int cnt = 0;
         do {
-            if (boundaryRemovableInVertexRemoval(node.neighbour, boundary)) {
+            if (boundaryRemovableInVertexRemoval(groupId, neighbourId, boundary)) {
                 if (boundary->face->facet_degree() == 3) {
                     boundary->face->setRemoved();
                     boundary->end_vertex->setRemoved();
@@ -187,9 +216,9 @@ void PartialEncoder::encodeBoundaryOp(int groupId) {
                     MCGAL::Vertex* v1 = boundary->vertex;
                     MCGAL::Vertex* v2 = boundary->next->end_vertex;
                     // 获得对面的groupId
-                    int removedVertexVid = origin2dup[dup2origin[boundary->end_vertex->id]][node.neighbour];
-                    int oppoVid1 = origin2dup[dup2origin[v1->id]][node.neighbour];
-                    int oppoVid2 = origin2dup[dup2origin[v2->id]][node.neighbour];
+                    int removedVertexVid = origin2dup[dup2origin[boundary->end_vertex->id]][neighbourId];
+                    int oppoVid1 = origin2dup[dup2origin[v1->id]][neighbourId];
+                    int oppoVid2 = origin2dup[dup2origin[v2->id]][neighbourId];
                     MCGAL::Vertex* removedVertex = MCGAL::contextPool.getVertexByVid(removedVertexVid);
                     MCGAL::Vertex* ov1 = MCGAL::contextPool.getVertexByVid(oppoVid1);
                     MCGAL::Vertex* ov2 = MCGAL::contextPool.getVertexByVid(oppoVid2);
@@ -198,20 +227,38 @@ void PartialEncoder::encodeBoundaryOp(int groupId) {
                      */
                     // 找到问题，不符合流行结构，需要进行检测
                     MCGAL::Facet* onew_face = MCGAL::contextPool.allocateFaceFromPool({removedVertex, ov2, ov1});
-                    onew_face->setGroupId(node.neighbour);
+                    onew_face->setGroupId(neighbourId);
                     MCGAL::Halfedge* startH;
+                    bool fg1 = false, fg2 = false, fg3 = false;
                     for (MCGAL::Halfedge* hit : ov1->halfedges) {
                         if (hit->end_vertex == removedVertex) {
+                            fg1 = true;
                             startH = hit;
                         }
                     }
                     for (MCGAL::Halfedge* hit : ov2->halfedges) {
                         if (hit->end_vertex == ov1) {
+                            fg2 = true;
                             hit->setBoundary();
+                            hit->opposite = nullptr;
                             break;
                         }
                     }
-                    subMeshes[node.neighbour].add_face(onew_face);
+                    for (MCGAL::Halfedge* hit : ov2->halfedges) {
+                        if (hit->end_vertex == removedVertex) {
+                            fg3 = true;
+                            hit->setNotBoundary();
+                            break;
+                        }
+                    }
+                    for (MCGAL::Halfedge* hit : removedVertex->halfedges) {
+                        if (hit->end_vertex == ov1) {
+                            hit->setNotBoundary();
+                            break;
+                        }
+                    }
+                    assert(fg1 && fg2 && fg3);
+                    subMeshes[neighbourId].add_face(onew_face);
                     MCGAL::Halfedge* h = startH->opposite;
                     MCGAL::Halfedge* end(h);
                     int removed = 0;
@@ -223,16 +270,16 @@ void PartialEncoder::encodeBoundaryOp(int groupId) {
                             MCGAL::Halfedge* hSplit(h->next);
                             for (; hSplit->next->next != h; hSplit = hSplit->next)
                                 ;
-                            MCGAL::Halfedge* hCorner = subMeshes[node.neighbour].split_facet(h, hSplit);
+                            MCGAL::Halfedge* hCorner = subMeshes[neighbourId].split_facet(h, hSplit);
                             hCorner->setAdded();
                         }
                         h->end_vertex->setConquered();
                         removed++;
                     } while ((h = h->opposite->next) != end);
 
-                    MCGAL::Halfedge* newH = subMeshes[node.neighbour].erase_center_vertex(startH);
-                    newH->face->setGroupId(node.neighbour);
-                    subMeshes[node.neighbour].add_face(newH->face);
+                    MCGAL::Halfedge* newH = subMeshes[neighbourId].erase_center_vertex(startH);
+                    newH->face->setGroupId(neighbourId);
+                    subMeshes[neighbourId].add_face(newH->face);
                     boundary = new_boundary;
                 } else if (boundary->face->facet_degree() > 3) {
                     // 这两个点之间构造一个边
@@ -250,9 +297,9 @@ void PartialEncoder::encodeBoundaryOp(int groupId) {
                     boundary->face->reset(boundary);
 
                     // 获得对面的groupId
-                    int removedVertexVid = origin2dup[dup2origin[oriRemovedVid]][node.neighbour];
-                    int oppoVid1 = origin2dup[dup2origin[v1->id]][node.neighbour];
-                    int oppoVid2 = origin2dup[dup2origin[v2->id]][node.neighbour];
+                    int removedVertexVid = origin2dup[dup2origin[oriRemovedVid]][neighbourId];
+                    int oppoVid1 = origin2dup[dup2origin[v1->id]][neighbourId];
+                    int oppoVid2 = origin2dup[dup2origin[v2->id]][neighbourId];
                     MCGAL::Vertex* removedVertex = MCGAL::contextPool.getVertexByVid(removedVertexVid);
                     MCGAL::Vertex* ov1 = MCGAL::contextPool.getVertexByVid(oppoVid1);
                     MCGAL::Vertex* ov2 = MCGAL::contextPool.getVertexByVid(oppoVid2);
@@ -266,13 +313,31 @@ void PartialEncoder::encodeBoundaryOp(int groupId) {
                             startH = hit;
                         }
                     }
+                    bool fg1 = false, fg2 = false, fg3 = false;
                     for (MCGAL::Halfedge* hit : ov2->halfedges) {
                         if (hit->end_vertex == ov1) {
+                            fg1 = true;
                             hit->setBoundary();
+                            hit->opposite = nullptr;
                             break;
                         }
                     }
-                    subMeshes[node.neighbour].add_face(onew_face);
+                    for (MCGAL::Halfedge* hit : ov2->halfedges) {
+                        if (hit->end_vertex == removedVertex) {
+                            fg2 = true;
+                            hit->setNotBoundary();
+                            break;
+                        }
+                    }
+                    for (MCGAL::Halfedge* hit : removedVertex->halfedges) {
+                        if (hit->end_vertex == ov1) {
+                            fg3 = true;
+                            hit->setNotBoundary();
+                            break;
+                        }
+                    }
+                    assert(fg1 && fg2 && fg3);
+                    subMeshes[neighbourId].add_face(onew_face);
                     MCGAL::Halfedge* h = startH->opposite;
                     MCGAL::Halfedge* end(h);
                     int removed = 0;
@@ -284,23 +349,23 @@ void PartialEncoder::encodeBoundaryOp(int groupId) {
                             MCGAL::Halfedge* hSplit(h->next);
                             for (; hSplit->next->next != h; hSplit = hSplit->next)
                                 ;
-                            MCGAL::Halfedge* hCorner = subMeshes[node.neighbour].split_facet(h, hSplit);
+                            MCGAL::Halfedge* hCorner = subMeshes[neighbourId].split_facet(h, hSplit);
                             hCorner->setAdded();
                         }
                         h->end_vertex->setConquered();
                         removed++;
                     } while ((h = h->opposite->next) != end);
 
-                    MCGAL::Halfedge* newH = subMeshes[node.neighbour].erase_center_vertex(startH);
-                    newH->face->setGroupId(node.neighbour);
-                    subMeshes[node.neighbour].add_face(newH->face);
+                    MCGAL::Halfedge* newH = subMeshes[neighbourId].erase_center_vertex(startH);
+                    newH->face->setGroupId(neighbourId);
+                    subMeshes[neighbourId].add_face(newH->face);
                     // boundary = new_boundary;
                 }
             }
             if (boundary->end_vertex->id == stopId) {
                 break;
             }
-            boundary = next_boundary(groupId, boundary);
+            boundary = next_boundary(neighbourId, boundary);
             cnt++;
         } while (boundary->end_vertex->id != stopId);
         std::cout << "boundary number: " << cnt << std::endl;
@@ -374,7 +439,7 @@ void PartialEncoder::resetState(int groupId) {
     });
 }
 
-bool PartialEncoder::boundaryRemovableInVertexRemoval(int ogroupId, MCGAL::Halfedge* hit) {
+bool PartialEncoder::boundaryRemovableInVertexRemoval(int inner, int outer, MCGAL::Halfedge* hit) {
     assert(hit->isBoundary());
     std::unordered_map<int, int> map1 = origin2dup[dup2origin[hit->vertex->id]];
     int t = dup2origin[hit->end_vertex->id];
@@ -387,22 +452,53 @@ bool PartialEncoder::boundaryRemovableInVertexRemoval(int ogroupId, MCGAL::Halfe
         MCGAL::Vertex* vit = hit->end_vertex;
         int t = dup2origin[hit->end_vertex->id];
         auto ddd = origin2dup[dup2origin[hit->end_vertex->id]];
-        assert(origin2dup[dup2origin[hit->end_vertex->id]].count(ogroupId));
-        int odupId = origin2dup[dup2origin[hit->end_vertex->id]][ogroupId];
+        assert(origin2dup[dup2origin[hit->end_vertex->id]].count(outer));
+        int odupId = origin2dup[dup2origin[hit->end_vertex->id]][outer];
         MCGAL::Vertex* ovit = MCGAL::contextPool.getVertexByVid(odupId);
         if (vit->halfedges.size() + ovit->halfedges.size() < 8) {
             std::vector<MCGAL::Point> vh_oneRing;
-            std::vector<MCGAL::Halfedge*> heh_oneRing;
-            heh_oneRing.reserve(vit->halfedges.size() + ovit->halfedges.size());
+            std::vector<MCGAL::Halfedge*> inner_oneRing;
+            std::vector<MCGAL::Halfedge*> outer_oneRing;
+            inner_oneRing.reserve(vit->halfedges.size());
+            outer_oneRing.reserve(ovit->halfedges.size());
+
+            /** 简单粗暴一点 */
+            int vid1 = hit->vertex->id;
+            int vid2 = hit->end_vertex->id;
+            int vid3 = hit->next->end_vertex->id;
+            int ovid1 = origin2dup[dup2origin[vid1]][outer];
+            int ovid2 = origin2dup[dup2origin[vid2]][outer];
+            int ovid3 = origin2dup[dup2origin[vid3]][outer];
+
+            MCGAL::Vertex* ovit1 = MCGAL::contextPool.getVertexByVid(ovid1);
+            MCGAL::Vertex* ovit2 = MCGAL::contextPool.getVertexByVid(ovid2);
+            MCGAL::Vertex* ovit3 = MCGAL::contextPool.getVertexByVid(ovid3);
+
+            MCGAL::Halfedge* ohit1 = nullptr;
+            MCGAL::Halfedge* ohit2 = nullptr;
+            for (MCGAL::Halfedge* ohit : ovit2->halfedges) {
+                if (ohit->end_vertex == ovit1) {
+                    ohit1 = ohit;
+                }
+            }
+            for (MCGAL::Halfedge* ohit : ovit3->halfedges) {
+                if (ohit->end_vertex == ovit2) {
+                    ohit2 = ohit;
+                }
+            }
+            if (ohit1->face->poolId == ohit2->face->poolId) {
+                return false;
+            }
+
             for (MCGAL::Halfedge* hit : vit->halfedges) {
                 vh_oneRing.push_back(hit->end_vertex->point());
-                heh_oneRing.push_back(hit);
+                inner_oneRing.push_back(hit);
             }
             for (MCGAL::Halfedge* hit : vit->halfedges) {
                 vh_oneRing.push_back(hit->end_vertex->point());
-                heh_oneRing.push_back(hit);
+                outer_oneRing.push_back(hit);
             }
-            return /*!willViolateManifoldInDup(heh_oneRing) && */ arePointsCoplanar(vh_oneRing);
+            return !willViolateManifoldInDup(inner, outer, inner_oneRing, outer_oneRing) && arePointsCoplanar(vh_oneRing);
         }
     }
     return false;
@@ -447,12 +543,24 @@ bool PartialEncoder::isBoundaryRemovable(MCGAL::Halfedge* h) {
     return h->canCollapse() && !h->isRemoved() && h->face->facet_degree() == 3 && h->opposite->face->facet_degree() == 3 && !willViolateManifold(hs);
 }
 
-bool PartialEncoder::isRemovable(MCGAL::Vertex* v) {
+bool PartialEncoder::isRemovable(int groupId, MCGAL::Vertex* v) {
     for (int i = 0; i < seeds.size(); i++) {
         if (v->poolId == seeds[i]->vertex->poolId || v->poolId == seeds[i]->end_vertex->poolId) {
             return false;
         }
     }
+
+    // std::unordered_set<Node>& nodes = graph.getNode(groupId);
+    // for (const Node& node : nodes) {
+    //     assert(origin2dup[node.st].count(groupId));
+    //     assert(origin2dup[node.ed].count(groupId));
+    //     if (origin2dup[node.st][groupId] == v->id) {
+    //         return false;
+    //     }
+    //     if (origin2dup[node.ed][groupId] == v->id) {
+    //         return false;
+    //     }
+    // }
 
     if (!v->isConquered() && v->vertex_degree() > 2 && v->vertex_degree() <= 8) {
         std::vector<MCGAL::Point> vh_oneRing;
@@ -465,7 +573,7 @@ bool PartialEncoder::isRemovable(MCGAL::Vertex* v) {
             vh_oneRing.push_back(hit->opposite->vertex->point());
             heh_oneRing.push_back(hit);
         }
-        bool removable = /*!willViolateManifold(heh_oneRing) && */ arePointsCoplanar(vh_oneRing);
+        bool removable = !willViolateManifold(heh_oneRing) && arePointsCoplanar(vh_oneRing);
         // if (removable) {
         //     return checkCompetition(v);
         // }
@@ -541,25 +649,45 @@ bool PartialEncoder::willViolateManifold(const std::vector<MCGAL::Halfedge*>& po
     return false;
 }
 
-bool PartialEncoder::willViolateManifoldInDup(const std::vector<MCGAL::Halfedge*>& polygon) const {
-    unsigned i_degree = polygon.size();
-    for (unsigned i = 0; i < i_degree; ++i) {
-        MCGAL::Halfedge* it = polygon[i];
+bool PartialEncoder::willViolateManifoldInDup(int inner, int outer, const std::vector<MCGAL::Halfedge*>& inner_oneRing, const std::vector<MCGAL::Halfedge*>& outer_oneRing) {
+    unsigned i_degree = inner_oneRing.size();
+
+    for (int i = 0; i < inner_oneRing.size(); i++) {
+        MCGAL::Halfedge* it = inner_oneRing[i];
         if (it->face->facet_degree() == 3) {
             continue;
         }
-
-        for (int j = 0; j < i_degree; j++) {
-            MCGAL::Halfedge* jt = polygon[j];
+        for (int j = 0; j < inner_oneRing.size(); j++) {
+            MCGAL::Halfedge* jt = inner_oneRing[j];
             if (i == j)
                 continue;
-            if (it->face == jt->opposite->face) {
-                for (int k = 0; k < it->end_vertex->halfedges.size(); k++) {
-                    if (it->end_vertex->halfedges[k]->end_vertex == jt->end_vertex) {
+            if (jt->opposite == nullptr) {
+                MCGAL::Vertex* vit1 = it->vertex;
+                MCGAL::Vertex* vit2 = it->end_vertex;
+                int vid1 = origin2dup[dup2origin[it->vertex->id]][outer];
+                int vid2 = origin2dup[dup2origin[it->end_vertex->id]][outer];
+                MCGAL::Vertex* v1 = MCGAL::contextPool.getVertexByVid(vid1);
+                MCGAL::Vertex* v2 = MCGAL::contextPool.getVertexByVid(vid2);
+                MCGAL::Halfedge* ohit1 = nullptr;
+                MCGAL::Halfedge* ohit2 = nullptr;
+                for (MCGAL::Halfedge* hit : v2->halfedges) {
+                    if (hit->end_vertex == v1) {
+                        ohit1 = hit;
+                    }
+                }
+                for (MCGAL::Halfedge* outer_hit : outer_oneRing) {
+                    if (outer_hit->face->poolId == ohit2->face->poolId) {
+                        ohit2 = outer_hit;
+                    }
+                }
+
+                for (int k = 0; k < v2->halfedges.size(); k++) {
+                    if (v2->halfedges[k]->end_vertex == ohit2->end_vertex) {
                         return true;
                     }
                 }
-            } else if (it->face == jt->face) {
+
+            } else if (it->face == jt->opposite->face) {
                 for (int k = 0; k < it->end_vertex->halfedges.size(); k++) {
                     if (it->end_vertex->halfedges[k]->end_vertex == jt->end_vertex) {
                         return true;
@@ -568,5 +696,51 @@ bool PartialEncoder::willViolateManifoldInDup(const std::vector<MCGAL::Halfedge*
             }
         }
     }
+
+    for (int i = 0; i < outer_oneRing.size(); i++) {
+        MCGAL::Halfedge* it = outer_oneRing[i];
+        if (it->face->facet_degree() == 3) {
+            continue;
+        }
+        for (int j = 0; j < outer_oneRing.size(); j++) {
+            MCGAL::Halfedge* jt = outer_oneRing[j];
+            if (i == j)
+                continue;
+            if (jt->opposite == nullptr) {
+                MCGAL::Vertex* vit1 = it->vertex;
+                MCGAL::Vertex* vit2 = it->end_vertex;
+                int vid1 = origin2dup[dup2origin[it->vertex->id]][inner];
+                int vid2 = origin2dup[dup2origin[it->end_vertex->id]][inner];
+                MCGAL::Vertex* v1 = MCGAL::contextPool.getVertexByVid(vid1);
+                MCGAL::Vertex* v2 = MCGAL::contextPool.getVertexByVid(vid2);
+                MCGAL::Halfedge* ohit1 = nullptr;
+                MCGAL::Halfedge* ohit2 = nullptr;
+                for (MCGAL::Halfedge* hit : v2->halfedges) {
+                    if (hit->end_vertex == v1) {
+                        ohit1 = hit;
+                    }
+                }
+                for (MCGAL::Halfedge* outer_hit : outer_oneRing) {
+                    if (outer_hit->face->poolId == ohit2->face->poolId) {
+                        ohit2 = outer_hit;
+                    }
+                }
+
+                for (int k = 0; k < v2->halfedges.size(); k++) {
+                    if (v2->halfedges[k]->end_vertex == ohit2->end_vertex) {
+                        return true;
+                    }
+                }
+
+            } else if (it->face == jt->opposite->face) {
+                for (int k = 0; k < it->end_vertex->halfedges.size(); k++) {
+                    if (it->end_vertex->halfedges[k]->end_vertex == jt->end_vertex) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
     return false;
 }
